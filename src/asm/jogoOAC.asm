@@ -110,6 +110,45 @@ PRINT_LINHA:
 	bgt t5,t2,PRINT_LINHA		
 	ret				# retorna
 #---------------------------------------------------------------------------
+#         PRINT_PERSONAGEM - 1 byte por pixel, transparência por pixel
+#---------------------------------------------------------------------------
+# a0 = imagem do personagem (header: largura, altura)
+# a1 = x destino, a2 = y destino, a3 = frame
+# a4 = valor de cinza considerado fundo (199 para o megamanStill)
+#---------------------------------------------------------------------------
+PRINT_PERSONAGEM:
+	li t0,0xFF0
+	add t0,t0,a3
+	slli t0,t0,20
+	add t0,t0,a1
+	li t1,320
+	mul t1,t1,a2
+	add t0,t0,t1			# t0 = endereço destino inicial (1 byte/pixel)
+
+	lw t4,0(a0)			# largura (48)
+	lw t5,4(a0)			# altura (48)
+	addi t1,a0,8			# t1 = ponteiro pros pixels (bytes)
+
+	mv t2,zero			# contador de linhas
+PP_LINHA:
+	mv t3,zero			# contador de pixels na linha
+PP_COPIA:
+	lbu t6,0(t1)			# lê 1 pixel (1 byte)
+	beq t6,a4,PP_PULA		# é fundo? pula esse pixel só
+	sb t6,0(t0)			# não é fundo -> desenha só esse pixel
+PP_PULA:
+	addi t0,t0,1			# avança 1 pixel na tela
+	addi t1,t1,1			# avança 1 pixel na fonte
+	addi t3,t3,1
+	blt t3,t4,PP_COPIA
+
+	addi t0,t0,320
+	sub t0,t0,t4			# volta pro início da próxima linha de tela
+	mv t3,zero
+	addi t2,t2,1
+	bgt t5,t2,PP_LINHA
+	ret
+#---------------------------------------------------------------------------
 #         MÉTODO PARA DESENHAR UMA JANELA (RECORTE) DE UMA
 #         IMAGEM LARGA - usado pra rolar o mapa de 1692x240
 #---------------------------------------------------------------------------
@@ -306,7 +345,8 @@ GL_SEM_TECLA:
 	la t0, PLAYER_Y
 	lw a2, 0(t0)
 	mv a3, s1
-	call PRINT
+	li a4, 199
+	call PRINT_PERSONAGEM
  
 	# troca o frame exibido
 	li t0, 0xFF200604
