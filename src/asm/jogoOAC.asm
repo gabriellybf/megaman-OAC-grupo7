@@ -13,6 +13,11 @@ PLAYER_X:     .word 0        # posição do personagem no MUNDO (0 .. MAP_LARGUR
 PLAYER_Y:     .word 145      # posição vertical na tela (0 .. 240-ALT_PERSONAGEM)
 CAMERA_X:     .word 0        # deslocamento da câmera dentro do mapa
 FRAME_ATIVO:  .word 0        # frame atualmente exibido (0 ou 1)
+PULANDO:      .word 0        # 0 = no chão, 1 = no ar
+VEL_Y:        .word 0        # velocidade vertical atual
+DIRECAO_ATUAL: .word 0        # -1 = esquerda, 0 = parado, 1 = direita
+VEL_X_PULO:    .word 0        # impulso horizontal guardado no momento do salto
+
  
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
@@ -21,9 +26,12 @@ FRAME_ATIVO:  .word 0        # frame atualmente exibido (0 ou 1)
 .eqv LARG_PERSONAGEM, 48
 .eqv VELOCIDADE, 4
 .eqv PLAYER_X_MAX, 1644
-.include "\script\Imagens\imagens_convertidas\arquivos .data\start320x240.data"
-.include "\script\Imagens\imagens_convertidas\arquivos .data\mapaFase1.data"
-.include "\script\Imagens\imagens_convertidas\arquivos .data\megamanStill.data"
+.eqv PLAYER_Y_CHAO, 145       # mesma posição inicial que você já usava
+.eqv IMPULSO_PULO, -13        # velocidade inicial pra cima (negativo = sobe)
+.eqv GRAVIDADE, 1             # aceleração pra baixo a cada frame
+.include "script/Imagens/imagens_convertidas/arquivos .data/start320x240.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/mapaFase1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/megamanStill.data"
 .include "MACROSv24.s"
 
 
@@ -269,55 +277,7 @@ Setup:
 #         redesenha o mapa (com scroll) e o personagem, troca de frame
 #---------------------------------------------------------------------------
 GAME_LOOP:
-	li t1, 0xFF200000
-	lw t6, 0(t1)
-	andi t6, t6, 1
-	beqz t6, GL_SEM_TECLA
- 
-	lw t2, 4(t1)
- 
-	li t3, 'd'
-	beq t2, t3, GL_DIREITA
-	li t3, 'a'
-	beq t2, t3, GL_ESQUERDA
-	j GL_SEM_TECLA
- 
-GL_DIREITA:
-	la t4, PLAYER_X
-	lw t5, 0(t4)
-	addi t5, t5, 4    # VELOCIDADE (VELOCIDADE = 4)
-	li t6, PLAYER_X_MAX
-	ble t5, t6, GL_SALVA_DIR
-	mv t5, t6
-GL_SALVA_DIR:
-	sw t5, 0(t4)
-	j GL_ATUALIZA_CAMERA
- 
-GL_ESQUERDA:
-	la t4, PLAYER_X
-	lw t5, 0(t4)
-	addi t5, t5, -4 #-VELOCIDADE (VELOCIDADE = 4)
-	bge t5, zero, GL_SALVA_ESQ
-	li t5, 0
-GL_SALVA_ESQ:
-	sw t5, 0(t4)
- 
-GL_ATUALIZA_CAMERA:
-	la t4, PLAYER_X
-	lw t5, 0(t4)
-	addi t5, t5, -160   # TELA_LARGURA/2 = 320/2 = 160
-	bge t5, zero, GL_CAM_MAX_CHECK
-	li t5, 0
-	j GL_SALVA_CAM
-GL_CAM_MAX_CHECK:
-	li t6, CAM_MAX
-	ble t5, t6, GL_SALVA_CAM
-	li t5, CAM_MAX
-GL_SALVA_CAM:
-	la t4, CAMERA_X
-	sw t5, 0(t4)
- 
-GL_SEM_TECLA:
+	call MOVIMENTACAO
 	# desenha no frame OCULTO (o oposto do que está sendo exibido)
 	la t4, FRAME_ATIVO
 	lw t5, 0(t4)
@@ -359,6 +319,131 @@ GL_SEM_TECLA:
 	ecall                      # pequena pausa (controla a velocidade do jogo)
  
 	j GAME_LOOP
+# ---------------------------------------------------------
+# LÓGICA DE MOVIMENTAÇÃO
+# ---------------------------------------------------------
+MOVIMENTACAO:
+	li t1, 0xFF200000
+	lw t6, 0(t1)
+	andi t6, t6, 1
+	beqz t6, MV_PARADO        # nenhuma tecla -> considera "parado"
+
+	lw t2, 4(t1)
+
+	li t3, 'd'
+	beq t2, t3, GL_DIREITA
+	li t3, 'a'
+	beq t2, t3, GL_ESQUERDA
+	li t3, 'w'
+	beq t2, t3, GL_PULA
+	j MV_PARADO                # tecla lida não é d/a/w -> também é "parado"
+
+GL_DIREITA:
+	la t4, PLAYER_X
+	lw t5, 0(t4)
+	addi t5, t5, 4
+	li t6, PLAYER_X_MAX
+	ble t5, t6, GL_SALVA_DIR
+	mv t5, t6
+GL_SALVA_DIR:
+	sw t5, 0(t4)
+	la t4, DIRECAO_ATUAL
+	li t5, 1
+	sw t5, 0(t4)
+	j MV_GRAVIDADE
+
+GL_ESQUERDA:
+	la t4, PLAYER_X
+	lw t5, 0(t4)
+	addi t5, t5, -4
+	bge t5, zero, GL_SALVA_ESQ
+	li t5, 0
+GL_SALVA_ESQ:
+	sw t5, 0(t4)
+	la t4, DIRECAO_ATUAL
+	li t5, -1
+	sw t5, 0(t4)
+	j MV_GRAVIDADE
+
+GL_PULA:
+	la t4, PULANDO
+	lw t5, 0(t4)
+	bnez t5, MV_GRAVIDADE          # já pulando -> ignora tecla nova
+	li t5, 1
+	sw t5, 0(t4)
+	la t4, VEL_Y
+	li t5, IMPULSO_PULO
+	sw t5, 0(t4)
+
+	# captura a direção atual como impulso horizontal do pulo
+	la t4, DIRECAO_ATUAL
+	lw t5, 0(t4)
+	li t6, 3                        # velocidade horizontal do pulo
+	mul t5, t5, t6
+	la t4, VEL_X_PULO
+	sw t5, 0(t4)
+	j MV_GRAVIDADE
+MV_PARADO:
+	la t4, DIRECAO_ATUAL
+	sw zero, 0(t4)                  # zera a direção -> pulo parado fica parado
+	j MV_GRAVIDADE
+MV_GRAVIDADE:
+	la t4, PULANDO
+	lw t5, 0(t4)
+	beqz t5, ATUALIZA_CAMERA        # não pulando -> não mexe em Y nem no impulso
+
+	# --- atualiza Y (gravidade) ---
+	la t4, VEL_Y
+	lw t5, 0(t4)
+	la t6, PLAYER_Y
+	lw t3, 0(t6)
+	add t3, t3, t5
+	addi t5, t5, GRAVIDADE
+	sw t5, 0(t4)
+
+	li t5, PLAYER_Y_CHAO
+	ble t3, t5, MV_AR_HORIZONTAL
+	li t3, PLAYER_Y_CHAO             # aterrissou
+	la t4, PULANDO
+	sw zero, 0(t4)
+	la t4, VEL_Y
+	sw zero, 0(t4)
+	la t4, VEL_X_PULO
+	sw zero, 0(t4)                    # zera o impulso ao tocar o chão
+MV_AR_HORIZONTAL:
+	sw t3, 0(t6)                        # salva PLAYER_Y
+
+	# --- aplica o impulso horizontal guardado no pulo ---
+	la t4, VEL_X_PULO
+	lw t5, 0(t4)
+	la t6, PLAYER_X
+	lw t3, 0(t6)
+	add t3, t3, t5
+	bge t3, zero, MV_CHECA_MAX
+	li t3, 0
+	j MV_SALVA_X
+MV_CHECA_MAX:
+	li t5, PLAYER_X_MAX
+	ble t3, t5, MV_SALVA_X
+	li t3, PLAYER_X_MAX
+MV_SALVA_X:
+	sw t3, 0(t6)
+
+ATUALIZA_CAMERA:
+	la t4, PLAYER_X
+	lw t5, 0(t4)
+	addi t5, t5, -160
+	bge t5, zero, AC_MAX_CHECK
+	li t5, 0
+	j AC_SALVA
+AC_MAX_CHECK:
+	li t6, CAM_MAX
+	ble t5, t6, AC_SALVA
+	li t5, CAM_MAX
+AC_SALVA:
+	la t4, CAMERA_X
+	sw t5, 0(t4)
+	ret
 	
 .data
 .include "SYSTEMv24.s"
