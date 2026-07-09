@@ -3,6 +3,7 @@
 # =========================================================
 .data
 # Numero de Notas a tocar
+pulaL: .string "\n"
 NUM: .word 125
 # lista de nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,...
 NOTAS: 60,1150,48,115,48,57,48,57,48,1150,48,115,48,57,48,57,48,230,43,230,53,230,55,230,53,230,65,230,67,230,65,230,53,230,55,230,48,230,65,230,67,230,65,230,55,230,59,690,67,230,60,115,60,115,60,230,55,230,55,230,55,230
@@ -17,8 +18,11 @@ PULANDO:      .word 0        # 0 = no chão, 1 = no ar
 VEL_Y:        .word 0        # velocidade vertical atual
 DIRECAO_ATUAL: .word 0        # -1 = esquerda, 0 = parado, 1 = direita
 VEL_X_PULO:    .word 0        # impulso horizontal guardado no momento do salto
-
- 
+VIDAS:        .word 3        # vidas atuais do jogador
+VIDAS_MAX:    .word 4        # vidas máximas (usado pra desenhar os "espaços vazios" se quiser)
+POWERUP_X:      .word 400       # posição no MUNDO (mesmo sistema de coordenadas do PLAYER_X)
+POWERUP_Y:      .word 100       # posição vertical na tela (mesmo sistema do PLAYER_Y)
+POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -32,6 +36,8 @@ VEL_X_PULO:    .word 0        # impulso horizontal guardado no momento do salto
 .include "script/Imagens/imagens_convertidas/arquivos .data/start320x240.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/mapaFase1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/megamanStill.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/coracao.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/cura.data"
 .include "MACROSv24.s"
 
 
@@ -278,6 +284,7 @@ Setup:
 #---------------------------------------------------------------------------
 GAME_LOOP:
 	call MOVIMENTACAO
+	call CHECA_COLISAO_POWERUP
 	# desenha no frame OCULTO (o oposto do que está sendo exibido)
 	la t4, FRAME_ATIVO
 	lw t5, 0(t4)
@@ -294,7 +301,7 @@ GAME_LOOP:
 	li a5, TELA_LARGURA
 	mv a3, s1
 	call PRINT_JANELA
- 
+
 	# NOVO: descomente quando tiver o sprite do personagem incluído
 	la a0, megamanStill
 	la t0, PLAYER_X
@@ -307,7 +314,8 @@ GAME_LOOP:
 	mv a3, s1
 	li a4, 199
 	call PRINT_PERSONAGEM
- 
+	call DESENHA_POWERUP
+	call DESENHA_HUD 
 	# troca o frame exibido
 	li t0, 0xFF200604
 	sw s1, 0(t0)
@@ -444,6 +452,112 @@ AC_SALVA:
 	la t4, CAMERA_X
 	sw t5, 0(t4)
 	ret
+#---------------------------------------------------------------------------
+#                     HUD DE VIDAS (canto superior esquerdo)
+#---------------------------------------------------------------------------
+DESENHA_HUD:
+	addi sp, sp, -4
+	sw ra, 0(sp)          # salva o endereço de retorno ANTES de chamar outra função
+
+	la t0, VIDAS
+	lw s2, 0(t0)          # vidas restantes
+	li s3, 0              # contador de ícones desenhados
+	li s4, 4              # x inicial (margem esquerda da tela)
+DH_LOOP:
+	beq s3, s2, DH_FIM
+	la a0, coracao
+	mv a1, s4
+	li a2, 4              # y (margem do topo)
+	mv a3, s1             # frame oculto atual (vem do GAME_LOOP)
+	li a4, 199            # cor de fundo transparente do ícone
+	call PRINT_PERSONAGEM
+	addi s4, s4, 34
+	addi s3, s3, 1
+	j DH_LOOP
+DH_FIM:
+	lw ra, 0(sp)           # restaura o endereço de retorno certo
+	addi sp, sp, 4
+	ret
+#---------------------------------------------------------------------------
+#                     DESENHA O POWER-UP DE CURA (se ainda não foi pego)
+#---------------------------------------------------------------------------
+DESENHA_POWERUP:
+	addi sp, sp, -4
+	sw ra, 0(sp)
+
+	la t0, POWERUP_ATIVO
+	lw t1, 0(t0)
+	beqz t1, DP_FIM
+
+	la a0, cura
+	la t0, POWERUP_X
+	lw t1, 0(t0)
+	la t0, CAMERA_X
+	lw t2, 0(t0)
+	sub a1, t1, t2
+	bltz a1, DP_FIM
+	li t5, TELA_LARGURA
+	bge a1, t5, DP_FIM
+
+	la t0, POWERUP_Y
+	lw a2, 0(t0)
+	mv a3, s1
+	li a4, 199
+	call PRINT_PERSONAGEM
+DP_FIM:
+	lw ra, 0(sp)
+	addi sp, sp, 4
+	ret
+#---------------------------------------------------------------------------
+#      CHECA_COLISAO_POWERUP - personagem encostou no power-up de cura?
+#---------------------------------------------------------------------------
+CHECA_COLISAO_POWERUP:
+	la t0, POWERUP_ATIVO
+	lw t1, 0(t0)
+	beqz t1, CP_FIM                 # já foi coletado, não checa mais
+
+	la t0, cura
+	lw t6, 0(t0)                    # largura do power-up
+	lw t2, 4(t0)                    # altura do power-up
 	
+	# --- eixo X ---
+	la t0, PLAYER_X
+	lw t3, 0(t0)                    # player x
+	la t0, POWERUP_X
+	lw t4, 0(t0)                    # powerup x
+
+	add t5, t4, t6                  # powerup_x + largura
+	bge t3, t5, CP_FIM                # player totalmente à direita -> sem colisão
+
+	li t5, LARG_PERSONAGEM
+	add t5, t3, t5                    # player_x + largura do personagem
+	ble t5, t4, CP_FIM                  # player totalmente à esquerda -> sem colisão
+
+	# --- eixo Y ---
+	la t0, PLAYER_Y
+	lw t3, 0(t0)                        # player y
+	la t0, POWERUP_Y
+	lw t4, 0(t0)                        # powerup y
+
+	add t5, t4, t2                      # powerup_y + altura
+	bge t3, t5, CP_FIM                    # player totalmente abaixo -> sem colisão
+
+	li t5, LARG_PERSONAGEM                # personagem é quadrado (48x48), reaproveita como altura
+	add t5, t3, t5
+	ble t5, t4, CP_FIM                      # player totalmente acima -> sem colisão
+
+	# --- colidiu! cura se não estiver no máximo ---
+	la t0, VIDAS
+	lw t1, 0(t0)
+	la t4, VIDAS_MAX
+	lw t4, 0(t4)
+	bge t1, t4, CP_REMOVE            # vida já no máximo -> só remove o power-up mesmo assim
+	addi t1, t1, 1
+	sw t1, 0(t0)
+CP_REMOVE:
+	la t0, POWERUP_ATIVO
+	sw zero, 0(t0)                     # some da tela (não desenha mais, não colide mais)
+CP_FIM:
+	ret
 .data
 .include "SYSTEMv24.s"
