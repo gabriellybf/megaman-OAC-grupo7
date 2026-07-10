@@ -23,6 +23,11 @@ VIDAS_MAX:    .word 4        # vidas máximas (usado pra desenhar os "espaços v
 POWERUP_X:      .word 400       # posição no MUNDO (mesmo sistema de coordenadas do PLAYER_X)
 POWERUP_Y:      .word 100       # posição vertical na tela (mesmo sistema do PLAYER_Y)
 POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
+# ---- animação do personagem ----
+FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o personagem está olhando; NÃO zera quando solta a tecla)
+ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
+ANIM_FRAME:   .word 0        # 0 ou 1 - qual dos 2 frames da animação atual está ativo
+.eqv ANIM_VELOCIDADE, 6      # troca de frame a cada 6 iterações do GAME_LOOP (ajuste pra mais rápido/devagar)
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -36,6 +41,12 @@ POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi col
 .include "script/Imagens/imagens_convertidas/arquivos .data/start320x240.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/mapaFase1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/megamanStill.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/48x48megamanrunninghero.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Run1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/RunL1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/RunL2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Jump-2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Jump-1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/coracao.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/cura.data"
 .include "MACROSv24.s"
@@ -82,7 +93,7 @@ MUSIC_WAIT:
     	andi t3, t3, 1
     	beqz t3, SEM_TECLA
     	lw t4, 4(t2)
-    	li t5, 's'
+    	li t5, '\n'
     	beq t4, t5, Interrompemusic
 SEM_TECLA:
     	addi t1, t1, -1
@@ -261,7 +272,7 @@ KEY_MENU:
     	andi t6, t6, 0x0001     # Mascara o bit menos significativo
     	beq t6, zero, KEY_MENU  # Se não a tecla, continua no loop
     	lw t2, 4(t1)            # Le o valor da tecla
-    	li t0, 's'
+    	li t0, '\n'
     	bne t2, t6, KEY_MENU    # Se não for 's', continua no loop
 # Se 's' foi pressionado, limpa a tela e vai para o setup do jogo
 Interrompemusic:
@@ -302,8 +313,9 @@ GAME_LOOP:
 	mv a3, s1
 	call PRINT_JANELA
 
-	# NOVO: descomente quando tiver o sprite do personagem incluído
-	la a0, megamanStill
+	# desenha o personagem já animado (corrida/pulo escolhidos em ESCOLHE_SPRITE)
+	call ATUALIZA_ANIMACAO
+	call ESCOLHE_SPRITE        # a0 já vem com o sprite certo escolhido
 	la t0, PLAYER_X
 	lw t1, 0(t0)
 	la t0, CAMERA_X
@@ -358,6 +370,8 @@ GL_SALVA_DIR:
 	la t4, DIRECAO_ATUAL
 	li t5, 1
 	sw t5, 0(t4)
+	la t4, FACING              # atualiza pra onde o personagem está olhando
+	sw t5, 0(t4)                # FACING = 1 (direita)
 	j MV_GRAVIDADE
 
 GL_ESQUERDA:
@@ -371,6 +385,8 @@ GL_SALVA_ESQ:
 	la t4, DIRECAO_ATUAL
 	li t5, -1
 	sw t5, 0(t4)
+	la t4, FACING               # atualiza pra onde o personagem está olhando
+	sw t5, 0(t4)                 # FACING = -1 (esquerda)
 	j MV_GRAVIDADE
 
 GL_PULA:
@@ -451,6 +467,98 @@ AC_MAX_CHECK:
 AC_SALVA:
 	la t4, CAMERA_X
 	sw t5, 0(t4)
+	ret
+#---------------------------------------------------------------------------
+#         ATUALIZA_ANIMACAO - avança o contador e alterna o frame
+#         (só anima se estiver correndo ou pulando; parado fica fixo)
+#---------------------------------------------------------------------------
+ATUALIZA_ANIMACAO:
+	la t0, DIRECAO_ATUAL
+	lw t1, 0(t0)
+	la t0, PULANDO
+	lw t2, 0(t0)
+	bnez t1, AA_ANIMA
+	bnez t2, AA_ANIMA
+
+	# parado e no chão -> zera timer e frame
+	la t0, ANIM_TIMER
+	sw zero, 0(t0)
+	la t0, ANIM_FRAME
+	sw zero, 0(t0)
+	ret
+AA_ANIMA:
+	la t0, ANIM_TIMER
+	lw t1, 0(t0)
+	addi t1, t1, 1
+	li t2, ANIM_VELOCIDADE
+	blt t1, t2, AA_SALVA
+	li t1, 0
+	la t3, ANIM_FRAME
+	lw t4, 0(t3)
+	xori t4, t4, 1
+	sw t4, 0(t3)
+AA_SALVA:
+	sw t1, 0(t0)
+	ret
+#---------------------------------------------------------------------------
+#         ESCOLHE_SPRITE - decide qual sprite desenhar
+#         retorna o endereço do sprite escolhido em a0
+#---------------------------------------------------------------------------
+ESCOLHE_SPRITE:
+	la t0, PULANDO
+	lw t1, 0(t0)
+	bnez t1, ES_PULO
+
+	la t0, DIRECAO_ATUAL
+	lw t1, 0(t0)
+	beqz t1, ES_PARADO
+	bgtz t1, ES_CORRE_DIR
+	j ES_CORRE_ESQ
+
+ES_PARADO:
+	la a0, megamanStill
+	ret
+
+ES_CORRE_DIR:
+	la t0, ANIM_FRAME
+	lw t1, 0(t0)
+	beqz t1, ES_DIR1
+	la a0, megamanrunninghero
+	ret
+ES_DIR1:
+	la a0, run1
+	ret
+
+ES_CORRE_ESQ:
+	la t0, ANIM_FRAME
+	lw t1, 0(t0)
+	beqz t1, ES_ESQ1
+	la a0, RunL2
+	ret
+ES_ESQ1:
+	la a0, RunL1
+	ret
+
+ES_PULO:
+	la t0, FACING
+	lw t1, 0(t0)
+	la t2, ANIM_FRAME
+	lw t3, 0(t2)
+	bgtz t1, ES_PULO_DIR
+	j ES_PULO_ESQ
+ES_PULO_DIR:
+	beqz t3, ES_PULO_DIR1
+	la a0, Jump2
+	ret
+ES_PULO_DIR1:
+	la a0, Jump1
+	ret
+ES_PULO_ESQ:
+	beqz t3, ES_PULO_ESQ1
+	la a0, Jump2
+	ret
+ES_PULO_ESQ1:
+	la a0, Jump1
 	ret
 #---------------------------------------------------------------------------
 #                     HUD DE VIDAS (canto superior esquerdo)
