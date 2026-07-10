@@ -68,7 +68,7 @@ MENU:
     lw a1, 0(t0)            # le o numero de notas
     li a2, 80               # define o instrumento
     li a3, 127              # define o volume
-	li a4, 2				# define velocidade
+	li a4, 1				# define velocidade
     jal ra, TOCA_TRECHO     # Pula para a função e salva o retorno
 
     # -------------------------------------------------
