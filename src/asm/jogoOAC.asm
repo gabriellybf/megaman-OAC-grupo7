@@ -27,6 +27,31 @@ POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi col
 Y_TENTATIVA:        .word 0
 VELY_TMP:           .word 0
 PLAYER_X_CANDIDATO: .word 0
+INVENCIVEL_TIMER: .word 0	# para ele não morrer assim que encostar no inimigo
+# ---- animação do personagem ----
+FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o personagem está olhando; NÃO zera quando solta a tecla)
+ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
+ANIM_FRAME:   .word 0        # 0 ou 1 - qual dos 2 frames da animação atual está ativo
+.eqv ANIM_VELOCIDADE, 6      # troca de frame a cada 6 iterações do GAME_LOOP (ajuste pra mais rápido/devagar)
+# ---- INIMIGO: planta piranha -----
+.eqv TAM_INIMIGO_PLANTA, 12      # 3 words = 12 bytes
+NUM_PLANTAS: .word 3
+PLANTAS:
+# planta 1
+.word 526     # x
+.word 128     # y
+.word 2       # vida
+# planta 2
+.word 886
+.word 128
+.word 2
+# planta 3
+.word 1347
+.word 133
+.word 2
+PLANTA_FRAME:	.word 0		# sprite atual (0 ou 1)
+PLANTA_TIMER:	.word 0		# contador
+
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -72,8 +97,17 @@ MAPA_COLISAO:
 .include "script/Imagens/imagens_convertidas/arquivos .data/start320x240.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/mapaFase1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/megamanStill.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/48x48megamanrunninghero.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Run1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/RunL1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/RunL2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Jump-2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/Jump-1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/coracao.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/cura.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/planta1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/planta2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/final.data"
 .include "MACROSv24.s"
  
  
@@ -118,7 +152,7 @@ MUSIC_WAIT:
     	andi t3, t3, 1
     	beqz t3, SEM_TECLA
     	lw t4, 4(t2)
-    	li t5, 's'
+    	li t5, '\n'
     	beq t4, t5, Interrompemusic
 SEM_TECLA:
     	addi t1, t1, -1
@@ -297,7 +331,7 @@ KEY_MENU:
     	andi t6, t6, 0x0001     # Mascara o bit menos significativo
     	beq t6, zero, KEY_MENU  # Se não a tecla, continua no loop
     	lw t2, 4(t1)            # Le o valor da tecla
-    	li t0, 's'
+    	li t0, '\n'
     	bne t2, t6, KEY_MENU    # Se não for 's', continua no loop
 # Se 's' foi pressionado, limpa a tela e vai para o setup do jogo
 Interrompemusic:
@@ -323,6 +357,8 @@ GAME_LOOP:
 	call CHECA_BATIDA_BLOCO  
 	call CHECA_COLISAO_POWERUP
 	call CHECA_PORTA   
+	call CHECA_COLISAO_PLANTAS
+	
 	# desenha no frame OCULTO (o oposto do que está sendo exibido)
 	la t4, FRAME_ATIVO
 	lw t5, 0(t4)
@@ -342,6 +378,10 @@ GAME_LOOP:
  
 	# NOVO: descomente quando tiver o sprite do personagem incluído
 	la a0, megamanStill
+
+	# desenha o personagem já animado (corrida/pulo escolhidos em ESCOLHE_SPRITE)
+	call ATUALIZA_ANIMACAO
+	call ESCOLHE_SPRITE        # a0 já vem com o sprite certo escolhido
 	la t0, PLAYER_X
 	lw t1, 0(t0)
 	la t0, CAMERA_X
@@ -354,6 +394,10 @@ GAME_LOOP:
 	call PRINT_PERSONAGEM
 	call DESENHA_POWERUP
 	call DESENHA_HUD 
+	
+	call ATUALIZA_PLANTA
+	call DESENHA_PLANTAS
+	
 	# troca o frame exibido
 	li t0, 0xFF200604
 	sw s1, 0(t0)
@@ -415,6 +459,8 @@ GL_DIR_ACEITA:
 	la t4, DIRECAO_ATUAL
 	li t5, 1
 	sw t5, 0(t4)
+	la t4, FACING              # atualiza pra onde o personagem está olhando
+	sw t5, 0(t4)                # FACING = 1 (direita)
 	j MV_GRAVIDADE
  
 GL_ESQUERDA:
@@ -457,6 +503,8 @@ GL_SALVA_ESQ:
 	la t4, DIRECAO_ATUAL
 	li t5, -1
 	sw t5, 0(t4)
+	la t4, FACING               # atualiza pra onde o personagem está olhando
+	sw t5, 0(t4)                 # FACING = -1 (esquerda)
 	j MV_GRAVIDADE
  
 GL_PULA:
@@ -629,6 +677,98 @@ AC_SALVA:
 	
 	lw ra, 0(sp)              # restaura o ra de MOVIMENTACAO
 	addi sp, sp, 4
+	ret
+#---------------------------------------------------------------------------
+#         ATUALIZA_ANIMACAO - avança o contador e alterna o frame
+#         (só anima se estiver correndo ou pulando; parado fica fixo)
+#---------------------------------------------------------------------------
+ATUALIZA_ANIMACAO:
+	la t0, DIRECAO_ATUAL
+	lw t1, 0(t0)
+	la t0, PULANDO
+	lw t2, 0(t0)
+	bnez t1, AA_ANIMA
+	bnez t2, AA_ANIMA
+
+	# parado e no chão -> zera timer e frame
+	la t0, ANIM_TIMER
+	sw zero, 0(t0)
+	la t0, ANIM_FRAME
+	sw zero, 0(t0)
+	ret
+AA_ANIMA:
+	la t0, ANIM_TIMER
+	lw t1, 0(t0)
+	addi t1, t1, 1
+	li t2, ANIM_VELOCIDADE
+	blt t1, t2, AA_SALVA
+	li t1, 0
+	la t3, ANIM_FRAME
+	lw t4, 0(t3)
+	xori t4, t4, 1
+	sw t4, 0(t3)
+AA_SALVA:
+	sw t1, 0(t0)
+	ret
+#---------------------------------------------------------------------------
+#         ESCOLHE_SPRITE - decide qual sprite desenhar
+#         retorna o endereço do sprite escolhido em a0
+#---------------------------------------------------------------------------
+ESCOLHE_SPRITE:
+	la t0, PULANDO
+	lw t1, 0(t0)
+	bnez t1, ES_PULO
+
+	la t0, DIRECAO_ATUAL
+	lw t1, 0(t0)
+	beqz t1, ES_PARADO
+	bgtz t1, ES_CORRE_DIR
+	j ES_CORRE_ESQ
+
+ES_PARADO:
+	la a0, megamanStill
+	ret
+
+ES_CORRE_DIR:
+	la t0, ANIM_FRAME
+	lw t1, 0(t0)
+	beqz t1, ES_DIR1
+	la a0, megamanrunninghero
+	ret
+ES_DIR1:
+	la a0, run1
+	ret
+
+ES_CORRE_ESQ:
+	la t0, ANIM_FRAME
+	lw t1, 0(t0)
+	beqz t1, ES_ESQ1
+	la a0, RunL2
+	ret
+ES_ESQ1:
+	la a0, RunL1
+	ret
+
+ES_PULO:
+	la t0, FACING
+	lw t1, 0(t0)
+	la t2, ANIM_FRAME
+	lw t3, 0(t2)
+	bgtz t1, ES_PULO_DIR
+	j ES_PULO_ESQ
+ES_PULO_DIR:
+	beqz t3, ES_PULO_DIR1
+	la a0, Jump2
+	ret
+ES_PULO_DIR1:
+	la a0, Jump1
+	ret
+ES_PULO_ESQ:
+	beqz t3, ES_PULO_ESQ1
+	la a0, Jump2
+	ret
+ES_PULO_ESQ1:
+	la a0, Jump1
 	ret
 #---------------------------------------------------------------------------
 #                     HUD DE VIDAS (canto superior esquerdo)
@@ -1008,5 +1148,266 @@ MARCA_TILE_USADO:
     li t5, 5
     sb t5, 0(t4)
     ret
+	
+    
+#-----------------------------------------------------------
+# CHECA COLISAO COM PLANTAS PIRANHAS
+#-----------------------------------------------------------
+CHECA_COLISAO_PLANTAS:
+    addi sp,sp,-4
+    sw ra,0(sp)
+    
+    # verifica invencibilidade
+    la t0,INVENCIVEL_TIMER
+    lw t1,0(t0)
+
+    beqz t1, CCP_CONTINUA
+
+    # ainda invencível
+    addi t1,t1,-1
+    sw t1,0(t0)
+    ret
+
+CCP_CONTINUA:
+    la t0,NUM_PLANTAS
+    lw s2,0(t0)
+
+    la s3,PLANTAS
+    li t3,0
+
+CCP_LOOP:
+    beq t3,s2,CCP_FIM
+
+    # verifica se a planta está viva
+    lw t4,8(s3)
+    beqz t4,CCP_PROXIMA
+
+
+# ---- eixo X ----
+    lw t5,0(s3)        # planta x
+    la t0,PLAYER_X
+    lw t6,0(t0)        # player x
+
+    # player direita da planta
+    addi t4,t5,48      # planta x + largura
+    bge t6,t4,CCP_PROXIMA
+
+    # player esquerda da planta
+    addi t4,t6,48      # player x + largura
+    ble t4,t5,CCP_PROXIMA
+
+# ----- eixo Y -----
+    lw t5,4(s3)        # planta y
+
+    la t0,PLAYER_Y
+    lw t6,0(t0)
+
+    # player abaixo
+    addi t4,t5,48
+
+    bge t6,t4,CCP_PROXIMA
+
+    # player acima
+    addi t4,t6,48
+    ble t4,t5,CCP_PROXIMA
+
+# ----- colidiu -----
+    # perde vida
+    la t0,VIDAS
+    lw t1,0(t0)
+    beqz t1,CCP_FIM
+    addi t1,t1,-1
+    sw t1,0(t0)
+    
+    call CHECA_GAME_OVER
+
+    # ativa invencibilidade
+    la t0,INVENCIVEL_TIMER
+    li t1,30
+    sw t1,0(t0)
+
+    # recua jogador
+    la t0,PLAYER_X
+    lw t1,0(t0)
+    la t2,DIRECAO_ATUAL
+    lw t2,0(t2)
+    bgtz t2,CCP_RECUA_ESQ
+
+# estava indo para esquerda - empurra para direita
+    addi t1,t1,40
+    j CCP_SALVA_RECUO
+
+CCP_RECUA_ESQ:
+    addi t1,t1,-40
+
+
+CCP_SALVA_RECUO:
+    bge t1,zero,CCP_OK_MIN
+    li t1,0
+
+CCP_OK_MIN:
+    sw t1,0(t0)
+    j CCP_FIM
+
+CCP_PROXIMA:
+    addi s3,s3,TAM_INIMIGO_PLANTA
+    addi t3,t3,1
+    j CCP_LOOP
+
+CCP_FIM:
+    lw ra,0(sp)
+    addi sp,sp,4
+    ret
+
+
+#-----------------------------------------------------------
+# ATUALIZA ANIMAÇÃO PLANTA PIRANHA
+# Frame 0 = planta1 | Frame 1 = planta2
+#-----------------------------------------------------------
+ATUALIZA_PLANTA:
+    # incrementa contador
+    la t0, PLANTA_TIMER
+    lw t1, 0(t0)
+
+    addi t1, t1, 1
+
+    li t2, 10              # velocidade da animação
+    blt t1,t2, AP_SALVA
+
+    # troca frame
+    li t1,0
+
+    la t3, PLANTA_FRAME
+    lw t4,0(t3)
+
+    xori t4,t4,1
+
+    sw t4,0(t3)
+
+AP_SALVA:
+    sw t1,0(t0)
+    ret
+   
+#-----------------------------------------------------------
+# DESENHA PLANTAS PIRANHAS
+#-----------------------------------------------------------
+DESENHA_PLANTAS:
+    addi sp,sp,-12
+    sw ra,0(sp)
+    sw s2,4(sp)
+    sw s3,8(sp)
+
+    la t0,NUM_PLANTAS
+    lw s2,0(t0)          # quantidade de plantas
+
+    la s3,PLANTAS        # ponteiro do vetor
+
+    li t3,0              # contador
+
+DESENHA_PLANTAS_LOOP:
+    beq t3,s2,DESENHA_PLANTAS_FIM
+
+    # lê vida
+    lw t4,8(s3)
+
+    beqz t4,DESENHA_PLANTAS_PROXIMA    # morta não desenha
+
+    # calcula posição X na tela
+    lw t5,0(s3)           # planta x mundo
+
+    la t6,CAMERA_X
+    lw t6,0(t6)
+
+    sub a1,t5,t6          # x tela
+
+    # se saiu pela esquerda
+    bltz a1,DESENHA_PLANTAS_PROXIMA
+
+    li t5,TELA_LARGURA
+
+    bge a1,t5,DESENHA_PLANTAS_PROXIMA
+
+    # Y
+    lw a2,4(s3)
+
+    # escolhe sprite
+    la t5,PLANTA_FRAME
+    lw t6,0(t5)
+
+    beqz t6,DESENHA_PLANTAS_FRAME0
+
+    # frame 1
+    la a0,planta2
+    j DESENHA_PLANTAS_DESENHA
+
+DESENHA_PLANTAS_FRAME0:
+    la a0,planta1
+
+DESENHA_PLANTAS_DESENHA:
+    mv a3,s1          # frame oculto
+    li a4,199         # transparência
+    call PRINT_PERSONAGEM
+
+DESENHA_PLANTAS_PROXIMA:
+    addi s3,s3,TAM_INIMIGO_PLANTA
+    addi t3,t3,1
+    j DESENHA_PLANTAS_LOOP
+
+DESENHA_PLANTAS_FIM:
+    lw ra,0(sp)
+    addi sp,sp,4
+    ret
+    
+#-----------------------------------------------------------
+# CHECA_GAME_OVER
+#-----------------------------------------------------------
+
+CHECA_GAME_OVER:
+    la t0,VIDAS
+    lw t1,0(t0)
+
+    bnez t1,CGO_FIM      # ainda tem vida
+
+    # acabou o jogo
+    j GAME_OVER
+
+CGO_FIM:
+    ret
+    
+#-----------------------------------------------------------
+# GAME_OVER
+#-----------------------------------------------------------
+GAME_OVER:
+    # limpa frame 0
+    li a3,0
+    call LIMPAR_FRAME_ATIVO
+
+    # limpa frame 1
+    li a3,1
+    call LIMPAR_FRAME_ATIVO
+
+    # desenha tela GAME OVER no frame 0
+    la a0,final
+    li a1,0
+    li a2,0
+    li a3,0
+    call PRINT
+
+    # desenha também no frame 1
+    la a0,final
+    li a1,0
+    li a2,0
+    li a3,1
+    call PRINT
+
+    # mostra frame 0
+    li t0,0xFF200604
+    li t1,0
+    sw t1,0(t0)
+
+GAME_OVER_LOOP:
+    j GAME_OVER_LOOP
+    
+    
 .data
 .include "SYSTEMv24.s"
