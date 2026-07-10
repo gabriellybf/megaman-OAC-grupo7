@@ -56,42 +56,82 @@ MENU:
 #-------------------------------------------------------------
 #                          MÚSICA
 #-------------------------------------------------------------
-    	li s0, 1
-    	li t0, 0xFF200604
-    	sw s0, 0(t0)
-       	la s0,NUM_1		# define o endereï¿½o do nï¿½mero de notas
-	lw s1,0(s0)		# le o numero de notas
-	la s0,NOTAS_1		# define o endereï¿½o das notas
-	li t0,0			# zera o contador de notas
-	li a2,80		# define o instrumento
-	li a3,127		# define o volume
+MAIN_MUSIC:
+    # -------------------------------------------------
+    # ATAQUE 1: MEGA MAN
+    # -------------------------------------------------
+    la a0, NOTAS_1       # Endereço das notas
+    la t0, NUM_1        # define o endereço do numero de notas
+    lw a1, 0(t0)            # le o numero de notas
+    li a2, 80               # define o instrumento
+    li a3, 127              # define o volume
+    jal ra, TOCA_TRECHO     # Pula para a função e salva o retorno
 
-LOOP:	beq t0,s1, FIMmusic		# contador chegou no final? entï¿½o  vï¿½ para FIM
-	lw a0,0(s0)		# le o valor da nota
-	lw a1,4(s0)		# le a duracao da nota
-	li a7,31		# define a chamada de syscall
-	ecall			# toca a nota
-	 # Espera personalizada com checagem de tecla
-    	li t1, 10
+    # -------------------------------------------------
+    # CONTRA-ATAQUE 1: MARIO
+    # -------------------------------------------------
+    la a0, NOTAS_2    # Endereço das notas
+    la t0, NUM_2        # define o endereço do numero de notas
+    lw a1, 0(t0)            # le o numero de notas
+    li a2, 12               # Instrumento MIDI (Marimba)
+    li a3, 127              # define o volume
+    jal ra, TOCA_TRECHO      =# Pula para a função e salva o retorno
+
+    j FIMmusic              # Terminou o duelo
+
+# ====================================================================
+# SUB-ROTINA: TOCA_TRECHO
+# Parâmetros: 
+# a0 = Endereço base do array de notas
+# a1 = Total de notas a tocar
+# a2 = Instrumento
+# a3 = Volume
+# ====================================================================
+TOCA_TRECHO:
+    mv s0, a0               # s0 = ponteiro do array
+    mv s1, a1               # s1 = limite do contador
+    li t0, 0                # t0 = contador atual
+
+LOOP_TRECHO:   
+    beq t0, s1, FIM_TRECHO  # Se tocou tudo, sai da função
+    lw a0, 0(s0)            # le o valor da nota
+    lw s2, 4(s0)            # le a duracao (salva em s2 para não perder)
+    
+    mv a1, s2               # coloca a duração no a1 para a ecall
+    li a7, 31               # ecall para MIDI
+    ecall           
+
+    # Espera personalizada com checagem de tecla (seu código mantido)
+    li t1, 10
 MUSIC_WAIT:
-    	li t2, 0xFF200000       # Endereço KDMMIO
-    	lw t3, 0(t2)
-    	andi t3, t3, 1
-    	beqz t3, SEM_TECLA
-    	lw t4, 4(t2)
-    	li t5, 's'
-    	beq t4, t5, Interrompemusic
+    li t2, 0xFF200000       # Endereço KDMMIO
+    lw t3, 0(t2)
+    andi t3, t3, 1
+    beqz t3, SEM_TECLA
+    lw t4, 4(t2)
+    li t5, 's'
+    beq t4, t5, Interrompemusic
 SEM_TECLA:
-    	addi t1, t1, -1
-    	bnez t1, MUSIC_WAIT
-    	mv a0,a1		# passa a duraï¿½ï¿½o da nota para a pausa
-	li a7,32		# define a chamada de syscal 
-	ecall			# realiza uma pausa de a0 ms
-	addi s0,s0,8		# incrementa para o endereï¿½o da prï¿½xima nota
-	addi t0,t0,1		# incrementa o contador de notas
-	j LOOP			# volta ao loop
-	
-FIMmusic:	j KEY_MENU
+    addi t1, t1, -1
+    bnez t1, MUSIC_WAIT
+
+    # Pausa entre notas
+    mv a0, s2               # resgata a duração
+    li a7, 32               # ecall de pausa
+    ecall           
+
+    addi s0, s0, 8          # vai para a próxima nota (pula 8 bytes)
+    addi t0, t0, 1          # incrementa contador
+    j LOOP_TRECHO          
+
+FIM_TRECHO:
+    ret                     # Volta para onde a função foi chamada (jal)
+
+Interrompemusic:
+    j KEY_MENU
+
+FIMmusic:   
+    j KEY_MENU
 #---------------------------------------------------------------------------
 #                     MÉTODO PARA DESENHAR NA TELA
 #---------------------------------------------------------------------------
