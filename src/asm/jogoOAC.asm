@@ -5,7 +5,7 @@
 # Numero de Notas a tocar
 pulaL: .string "\n"
 NUM: .word 125
-# lista de nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,...
+# lista de nota,duração,nota,duração,nota,duração,...
 NOTAS: 60,1150,48,115,48,57,48,57,48,1150,48,115,48,57,48,57,48,230,43,230,53,230,55,230,53,230,65,230,67,230,65,230,53,230,55,230,48,230,65,230,67,230,65,230,55,230,59,690,67,230,60,115,60,115,60,230,55,230,55,230,55,230
 60,1200,67,1200,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,65,250,62,1500,55,50,55,100,55,100,60,1200,67,1200,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,65,200,62,1200,55,200,55,200,55,200
 57,927,57,309,65,309,64,309,62,309,60,309,60,206,62,206,64,206,62,412,57,206,59,618,55,412,55,206,57,1236,65,309,64,309,62,309,60,309,67,618,62,1545,55,309,57,1236,65,309,64,309,62,309,60,309,60,206,62,206,64,206,62,412,57,206,59,618,67,412,67,206,72,412,71,206,69,412,67,206,65,412,64,206,62,412,60,206,67,618,43,412,43,103,43,103,43,618,55,309,55,103,55,103,55,103,57,927,60,309,65,618,62,618
@@ -41,6 +41,20 @@ FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o perso
 ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
 ANIM_FRAME:   .word 0        # 0 ou 1 - qual dos 2 frames da animação atual está ativo
 .eqv ANIM_VELOCIDADE, 6      # troca de frame a cada 6 iterações do GAME_LOOP (ajuste pra mais rápido/devagar)
+
+# ---- ataques ----
+ARMA_ATUAL:   .word 0        # 0 = projétil (tiro), 1 = soco (melee) - trocado com a tecla Q
+ATACANDO:     .word 0        # 1 enquanto a pose/animação de ataque está tocando
+ATAQUE_TIMER: .word 0        # contador regressivo da duração do ataque atual
+.eqv ATAQUE_DURACAO, 10       # quantos ciclos do GAME_LOOP a pose de ataque fica na tela
+TIRO_ATIVO:    .word 0        # 1 = tem projétil voando na tela agora
+TIRO_X:        .word 0        # posição do projétil no MUNDO (mesmo sistema do PLAYER_X)
+TIRO_Y:        .word 0        # posição vertical do projétil na tela
+TIRO_DIRECAO:  .word 1        # direção que o projétil está viajando (1 = direita, -1 = esquerda)
+TIRO_DIST:     .word 0        # quantos pixels o projétil já percorreu desde que foi disparado
+.eqv TIRO_VELOCIDADE, 8       # <-- CONTROLA A VELOCIDADE: pixels que o projétil anda por ciclo (aumente pra ele ir mais rápido)
+.eqv TIRO_ALCANCE, 150        # <-- CONTROLA A DURAÇÃO/ALCANCE: quantos pixels o projétil viaja até sumir (aumente pra ele ir mais longe)
+
 # ---- INIMIGO: planta piranha -----
 .eqv TAM_INIMIGO_PLANTA, 12      # 3 words = 12 bytes
 NUM_PLANTAS: .word 3
@@ -60,6 +74,25 @@ PLANTAS:
 PLANTA_FRAME:	.word 0		# sprite atual (0 ou 1)
 PLANTA_TIMER:	.word 0		# contador
 
+# ---- INIMIGO2---------
+.eqv TAM_INIMIGO_ANDADOR, 20    # 5 words = 20 bytes
+NUM_ANDADORES: .word 2
+ANDADORES:
+# andador 1
+.word 200     # x mundo
+.word 145     # y tela
+.word 2       # vida
+.word 1       # direcao (1=direita, -1=esquerda)
+.word 200     # x_min (limite esquerdo da patrulha)
+#andador 2 
+.word 1000   # x → perto do final do mapa
+.word 145    # y → mesmo nível do chão, não muda
+.word 2      # vida
+.word -1     # direcao (começa indo para esquerda)
+.word 1450   # x_min (patrulha de 1450 até 1550)
+
+ANDADOR_FRAME:  .word 0
+ANDADOR_TIMER:  .word 0
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -131,13 +164,24 @@ MAPA_COLISAO2:
 .include "script/Imagens/imagens_convertidas/arquivos .data/RunL2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/Jump-2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/Jump-1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/TiroL.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/TiroR.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/socoesq.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/socodir.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/fire.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/coracao.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/cura.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/fireesq.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/planta1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/planta2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/final.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/fase2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/mapaFase2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/inimigoR1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/inimigoR2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL2.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/youwin.data"
 .include "MACROSv24.s"
  
  
@@ -162,14 +206,14 @@ MENU:
     	li s0, 1
     	li t0, 0xFF200604
     	sw s0, 0(t0)
-       	la s0,NUM		# define o endereï¿½o do nï¿½mero de notas
+       	la s0,NUM		# define o endereço do numero de notas
 	lw s1,0(s0)		# le o numero de notas
-	la s0,NOTAS		# define o endereï¿½o das notas
+	la s0,NOTAS		# define o endereço das notas
 	li t0,0			# zera o contador de notas
 	li a2,68		# define o instrumento
 	li a3,127		# define o volume
- 
-LOOP:	beq t0,s1, FIMmusic		# contador chegou no final? entï¿½o  vï¿½ para FIM
+
+LOOP:	beq t0,s1, FIMmusic		# contador chegou no final? entao va para FIM
 	lw a0,0(s0)		# le o valor da nota
 	lw a1,4(s0)		# le a duracao da nota
 	li a7,31		# define a chamada de syscall
@@ -187,10 +231,10 @@ MUSIC_WAIT:
 SEM_TECLA:
     	addi t1, t1, -1
     	bnez t1, MUSIC_WAIT
-    	mv a0,a1		# passa a duraï¿½ï¿½o da nota para a pausa
+    	mv a0,a1		# passa a duração da nota para a pausa
 	li a7,32		# define a chamada de syscal 
 	ecall			# realiza uma pausa de a0 ms
-	addi s0,s0,8		# incrementa para o endereï¿½o da prï¿½xima nota
+	addi s0,s0,8		# incrementa para o endereço da proxima nota
 	addi t0,t0,1		# incrementa o contador de notas
 	j LOOP			# volta ao loop
 	
@@ -313,7 +357,7 @@ PJ_COPIA:
 # LIMPA O FRAME 1
 # ---------------------------------------------------------
 LIMPAR_FRAME_1:
-    	li t0, 0xFF100000      # EndereÃ§o base do frame 1
+    	li t0, 0xFF100000      # Endereço base do frame 1
     	li t1, 19200           # 320x240 / 4 (pois usamos sw)
     	li t2, 0x00000000      # Cor preta
 CLEAR_LOOP:
@@ -407,6 +451,12 @@ GAME_LOOP:
 	call CHECA_COLISAO_POWERUP
 	call CHECA_PORTA   
 	call CHECA_COLISAO_PLANTAS
+	call CHECA_TIRO_PLANTAS
+	call CHECA_TIRO_ANDADORES
+	call CHECA_COLISAO_ANDADORES
+	call ATUALIZA_ANDADORES
+	call CHECA_SOCO_PLANTAS
+	call CHECA_SOCO_ANDADORES
 	
 	# desenha no frame OCULTO (o oposto do que está sendo exibido)
 	la t4, FRAME_ATIVO
@@ -429,7 +479,7 @@ GAME_LOOP:
 	# NOVO: descomente quando tiver o sprite do personagem incluído
 	la a0, megamanStill
 
-	# desenha o personagem já animado (corrida/pulo escolhidos em ESCOLHE_SPRITE)
+	# desenha o personagem já animado (corrida/pulo/ataque escolhidos em ESCOLHE_SPRITE)
 	call ATUALIZA_ANIMACAO
 	call ESCOLHE_SPRITE        # a0 já vem com o sprite certo escolhido
 	la t0, PLAYER_X
@@ -442,11 +492,14 @@ GAME_LOOP:
 	mv a3, s1
 	li a4, 199
 	call PRINT_PERSONAGEM
+	call ATUALIZA_ATAQUE
+	call DESENHA_TIRO
 	call DESENHA_POWERUP
 	call DESENHA_HUD 
 	
 	call ATUALIZA_PLANTA
 	call DESENHA_PLANTAS
+	call DESENHA_ANDADORES
 	
 	# troca o frame exibido
 	li t0, 0xFF200604
@@ -480,8 +533,12 @@ MOVIMENTACAO:
 	beq t2, t3, GL_ESQUERDA
 	li t3, 'w'
 	beq t2, t3, GL_PULA
-	j MV_PARADO                # tecla lida não é d/a/w -> também é "parado"
-	
+	li t3, 'e'
+	beq t2, t3, GL_ATAQUE
+	li t3, 'q'                 # tecla para troca de ataque 
+	beq t2, t3, GL_TROCA_ARMA
+	j MV_PARADO                # tecla lida não é d/a/w/e/q -> também é "parado"
+
 GL_DIREITA:
 	la t4, PLAYER_X
 	lw t5, 0(t4)
@@ -574,6 +631,50 @@ GL_PULA:
 	li t6, 3                        # velocidade horizontal do pulo
 	mul t5, t5, t6
 	la t4, VEL_X_PULO
+	sw t5, 0(t4)
+	j MV_GRAVIDADE
+
+GL_ATAQUE:
+	la t4, ATAQUE_TIMER
+	lw t5, 0(t4)
+	bnez t5, MV_GRAVIDADE          # já tem um ataque tocando -> ignora tecla nova
+
+	li t5, ATAQUE_DURACAO
+	sw t5, 0(t4)
+	la t4, ATACANDO
+	li t5, 1
+	sw t5, 0(t4)
+
+	la t4, ARMA_ATUAL
+	lw t5, 0(t4)
+	bnez t5, MV_GRAVIDADE            # arma = 1 (soco) -> só a pose já resolve, sem projétil
+
+	# arma = 0 (projétil) -> dispara um tiro, se não houver outro na tela
+	la t4, TIRO_ATIVO
+	lw t6, 0(t4)
+	bnez t6, MV_GRAVIDADE             # já tem projétil voando -> não dispara outro
+	li t6, 1
+	sw t6, 0(t4)
+	la t4, PLAYER_X
+	lw t6, 0(t4)
+	la t4, TIRO_X
+	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL X: o projétil nasce na posição atual do personagem
+	la t4, PLAYER_Y
+	lw t6, 0(t4)
+	la t4, TIRO_Y
+	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL Y: o projétil nasce na mesma altura do personagem
+	la t4, FACING
+	lw t6, 0(t4)
+	la t4, TIRO_DIRECAO
+	sw t6, 0(t4)                       # <-- DIREÇÃO DO PROJÉTIL: copia o FACING (lado que o personagem está olhando)
+	la t4, TIRO_DIST
+	sw zero, 0(t4)                     # <-- ZERA A DISTÂNCIA PERCORRIDA (começa a contar do zero pro alcance máximo)
+	j MV_GRAVIDADE
+
+GL_TROCA_ARMA:
+	la t4, ARMA_ATUAL
+	lw t5, 0(t4)
+	xori t5, t5, 1                  # alterna entre 0 (projétil) e 1 (soco)
 	sw t5, 0(t4)
 	j MV_GRAVIDADE
 MV_PARADO:
@@ -766,10 +867,120 @@ AA_SALVA:
 	sw t1, 0(t0)
 	ret
 #---------------------------------------------------------------------------
+#         ATUALIZA_ATAQUE - conta o tempo da pose de ataque e move o projétil
+#---------------------------------------------------------------------------
+ATUALIZA_ATAQUE:
+	# --- timer da pose de ataque (soco/tiro) ---
+	la t0, ATAQUE_TIMER
+	lw t1, 0(t0)
+	beqz t1, AT_TIRO
+	addi t1, t1, -1
+	sw t1, 0(t0)
+	bnez t1, AT_TIRO
+	la t0, ATACANDO
+	sw zero, 0(t0)                  # pose de ataque terminou
+
+AT_TIRO:
+	la t0, TIRO_ATIVO
+	lw t1, 0(t0)
+	beqz t1, AT_FIM
+
+	#  POSIÇÃO ATUALIZADA: TIRO_X += TIRO_VELOCIDADE * TIRO_DIRECAO (roda a cada ciclo do GAME_LOOP)
+	la t0, TIRO_DIRECAO
+	lw t2, 0(t0)
+	li t3, TIRO_VELOCIDADE
+	mul t2, t2, t3
+	la t0, TIRO_X
+	lw t4, 0(t0)
+	add t4, t4, t2
+	sw t4, 0(t0)
+
+	# DURAÇÃO/ALCANCE: soma a distância percorrida e compara com TIRO_ALCANCE
+	la t0, TIRO_DIST
+	lw t5, 0(t0)
+	li t6, TIRO_VELOCIDADE
+	add t5, t5, t6
+	sw t5, 0(t0)
+	li t6, TIRO_ALCANCE
+	blt t5, t6, AT_FIM               # ainda não chegou no alcance máximo -> continua voando
+
+	# passou do alcance -> projétil desativado (some da tela, libera pra atirar de novo)
+	la t0, TIRO_ATIVO
+	sw zero, 0(t0)
+	la t0, TIRO_DIST
+	sw zero, 0(t0)
+AT_FIM:
+	ret
+#---------------------------------------------------------------------------
+#         DESENHA_TIRO - desenha o projétil na tela, se estiver ativo
+#---------------------------------------------------------------------------
+DESENHA_TIRO:
+	addi sp, sp, -4
+	sw ra, 0(sp)            
+
+	la t0, TIRO_ATIVO
+	lw t1, 0(t0)
+	beqz t1, DT_FIM
+
+	la t0, TIRO_DIRECAO
+	lw t1, 0(t0)
+	bgtz t1, DT_DIR
+	la a0, fireesq       
+	j DT_POS
+DT_DIR:
+	la a0, fire
+DT_POS:
+	la t0, TIRO_X
+	lw t1, 0(t0)
+	la t0, CAMERA_X
+	lw t2, 0(t0)
+	sub a1, t1, t2
+	bltz a1, DT_FIM
+	li t5, TELA_LARGURA
+	bge a1, t5, DT_FIM
+	la t0, TIRO_Y
+	lw a2, 0(t0)
+	mv a3, s1
+	li a4, 199
+	call PRINT_PERSONAGEM
+DT_FIM:
+	lw ra, 0(sp)              
+	addi sp, sp, 4
+	ret
+#---------------------------------------------------------------------------
 #         ESCOLHE_SPRITE - decide qual sprite desenhar
 #         retorna o endereço do sprite escolhido em a0
 #---------------------------------------------------------------------------
 ESCOLHE_SPRITE:
+	# se estiver atacando, a pose de ataque tem prioridade sobre corrida/pulo/parado
+	la t0, ATACANDO
+	lw t1, 0(t0)
+	beqz t1, ES_CHECA_PULO
+	la t0, ARMA_ATUAL
+	lw t2, 0(t0)
+	bnez t2, ES_POSE_SOCO           # arma = 1 (soco) -> pula pra pose de soco
+
+	# arma = 0 (projétil) -> personagem mostra pose de ATIRANDO
+	la t0, FACING
+	lw t3, 0(t0)
+	bgtz t3, ES_ATIRA_DIR
+	la a0, TiroL    
+	ret
+ES_ATIRA_DIR:
+	la a0, TiroR     
+	ret
+
+ES_POSE_SOCO:
+	la t0, FACING
+	lw t3, 0(t0)
+	bgtz t3, ES_SOCO_DIR
+	la a0, socoesq    
+	ret
+ES_SOCO_DIR:
+	la a0, socodir     
+	ret
+
+ES_CHECA_PULO:
 	la t0, PULANDO
 	lw t1, 0(t0)
 	bnez t1, ES_PULO
@@ -805,24 +1016,12 @@ ES_ESQ1:
 	ret
 
 ES_PULO:
-	la t0, FACING
+	la t0, ANIM_FRAME
 	lw t1, 0(t0)
-	la t2, ANIM_FRAME
-	lw t3, 0(t2)
-	bgtz t1, ES_PULO_DIR
-	j ES_PULO_ESQ
-ES_PULO_DIR:
-	beqz t3, ES_PULO_DIR1
+	beqz t1, ES_PULO1
 	la a0, Jump2
 	ret
-ES_PULO_DIR1:
-	la a0, Jump1
-	ret
-ES_PULO_ESQ:
-	beqz t3, ES_PULO_ESQ1
-	la a0, Jump2
-	ret
-ES_PULO_ESQ1:
+ES_PULO1:
 	la a0, Jump1
 	ret
 #---------------------------------------------------------------------------
@@ -1168,8 +1367,8 @@ CBB_FIM:
 # ---------------------------------------------------------
 CHECA_PORTA:
     addi sp, sp, -4
-    sw ra, 0(sp)              # salva o endereço de retorno ANTES do call
- 
+    sw ra, 0(sp)
+
     la t0, PLAYER_X
     lw a0, 0(t0)
     addi a0, a0, LARG_PERSONAGEM2
@@ -1177,15 +1376,25 @@ CHECA_PORTA:
     lw a1, 0(t0)
     addi a1, a1, LARG_PERSONAGEM2
     call GET_TILE
- 
-    lw ra, 0(sp)              # restaura o ra certo ANTES de decidir o que fazer
+
+    lw ra, 0(sp)
     addi sp, sp, 4
- 
+
     li t1, 4
-    beq a0, t1, CP_VAI_FASE2
-    ret
+    bne a0, t1, FIM
+
+    la t0, FASE_ATUAL
+    lw t1, 0(t0)
+    li t2, 2
+    beq t1, t2, CP_VAI_VITORIA
+    j CP_VAI_FASE2
+
 CP_VAI_FASE2:
     j TRANSICAO_FASE2
+CP_VAI_VITORIA:
+    j TELA_VITORIA
+FIM:
+    ret
  
 # ---------------------------------------------------------
 # Marca uma Mystery Box como "usada" (valor 5)
@@ -1312,7 +1521,42 @@ CARREGA_FASE2:
     lw ra, 0(sp)
     addi sp, sp, 4
     ret
-    
+#------------------------------------------------------
+#                         VITÓRIA
+#------------------------------------------------------ 
+TELA_VITORIA:
+    li a3, 0
+    call LIMPAR_FRAME_ATIVO
+    li a3, 1
+    call LIMPAR_FRAME_ATIVO
+
+    la a0, youwin       
+    li a1, 0
+    li a2, 0
+    li a3, 0
+    call PRINT
+
+    la a0, youwin
+    li a1, 0
+    li a2, 0
+    li a3, 1
+    call PRINT
+
+    li t0, 0xFF200604
+    li t1, 0
+    sw t1, 0(t0)
+
+    # espera 5 minutos (3000 x 100ms)
+    li s5, 3000
+TV_ESPERA:
+    li a0, 100
+    li a7, 32
+    ecall
+    addi s5, s5, -1
+    bnez s5, TV_ESPERA
+
+    li a7, 10
+    ecall
 #-----------------------------------------------------------
 # CHECA COLISAO COM PLANTAS PIRANHAS
 #-----------------------------------------------------------
@@ -1519,7 +1763,8 @@ DESENHA_PLANTAS_PROXIMA:
 DESENHA_PLANTAS_FIM:
     lw ra,0(sp)
     addi sp,sp,4
-    ret
+    ret   
+    
     
 #-----------------------------------------------------------
 # CHECA_GAME_OVER
@@ -1571,6 +1816,494 @@ GAME_OVER:
 GAME_OVER_LOOP:
     j GAME_OVER_LOOP
     
+    #-----------------------------------------------------------
+# COLISAO TIRO COM PLANTAS
+#-----------------------------------------------------------
+CHECA_TIRO_PLANTAS:
+    la t0, TIRO_ATIVO
+    lw t1, 0(t0)
+    beqz t1, CTP_FIM          # sem tiro ativo, não checa
+
+    la t0, NUM_PLANTAS
+    lw s2, 0(t0)
+    la s3, PLANTAS
+    li t3, 0
+
+CTP_LOOP:
+    beq t3, s2, CTP_FIM
+
+    lw t4, 8(s3)              # vida da planta
+    beqz t4, CTP_PROXIMA      # morta, pula
+
+    # eixo X
+    lw t5, 0(s3)              # planta x
+    la t0, TIRO_X
+    lw t6, 0(t0)              # tiro x
+
+    addi t4, t5, 24           # planta x + largura (24)
+    bge t6, t4, CTP_PROXIMA   # tiro à direita da planta
+
+    addi t4, t6, 8            # tiro x + largura do tiro
+    ble t4, t5, CTP_PROXIMA   # tiro à esquerda da planta
+
+    # eixo Y
+    lw t5, 4(s3)              # planta y
+    la t0, TIRO_Y
+    lw t6, 0(t0)              # tiro y
+
+    addi t4, t5, 32           # planta y + altura (32)
+    bge t6, t4, CTP_PROXIMA
+
+    addi t4, t6, 8
+    ble t4, t5, CTP_PROXIMA
+
+    # acertou — reduz vida da planta
+    lw t4, 8(s3)
+    addi t4, t4, -1
+    sw t4, 8(s3)
+
+    # desativa o tiro
+    la t0, TIRO_ATIVO
+    sw zero, 0(t0)
+    la t0, TIRO_DIST
+    sw zero, 0(t0)
+
+CTP_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_PLANTA
+    addi t3, t3, 1
+    j CTP_LOOP
+
+CTP_FIM:
+    ret
+
+#-----------------------------------------------------------
+# COLISAO TIRO COM ANDADORES
+#-----------------------------------------------------------
+CHECA_TIRO_ANDADORES:
+    la t0, TIRO_ATIVO
+    lw t1, 0(t0)
+    beqz t1, CTA_FIM
+
+    la t0, NUM_ANDADORES
+    lw s2, 0(t0)
+    la s3, ANDADORES
+    li t3, 0
+
+CTA_LOOP:
+    beq t3, s2, CTA_FIM
+
+    lw t4, 8(s3)              # vida
+    beqz t4, CTA_PROXIMA
+
+    # eixo X
+    lw t5, 0(s3)              # andador x
+    la t0, TIRO_X
+    lw t6, 0(t0)
+
+    addi t4, t5, 48
+    bge t6, t4, CTA_PROXIMA
+
+    addi t4, t6, 8
+    ble t4, t5, CTA_PROXIMA
+
+    # eixo Y
+    lw t5, 4(s3)
+    la t0, TIRO_Y
+    lw t6, 0(t0)
+
+    addi t4, t5, 48
+    bge t6, t4, CTA_PROXIMA
+
+    addi t4, t6, 8
+    ble t4, t5, CTA_PROXIMA
+
+    # acertou
+    lw t4, 8(s3)
+    addi t4, t4, -1
+    sw t4, 8(s3)
+
+    la t0, TIRO_ATIVO
+    sw zero, 0(t0)
+    la t0, TIRO_DIST
+    sw zero, 0(t0)
+
+CTA_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_ANDADOR
+    addi t3, t3, 1
+    j CTA_LOOP
+
+CTA_FIM:
+    ret
+
+#-----------------------------------------------------------
+# ATUALIZA ANDADORES - move e anima
+#-----------------------------------------------------------
+ATUALIZA_ANDADORES:
+    la t0, NUM_ANDADORES
+    lw s2, 0(t0)
+    la s3, ANDADORES
+    li t3, 0
+AA2_LOOP:
+    beq t3, s2, AA2_FIM
+    lw t4, 8(s3)              # vida
+    beqz t4, AA2_PROXIMA      # morto, pula
+    lw t5, 0(s3)              # x atual
+    lw t6, 12(s3)             # direcao (1 ou -1)
+    lw t0, 16(s3)             # x_min da patrulha
+    li t1, 100                # tamanho da patrulha (x_min + 100 = x_max)
+    add t1, t0, t1            # t1 = x_max
+    # move
+    add t5, t5, t6            # x += direcao (velocidade 1)
+    
+    add t5, t5, t6
+    # checa limites e inverte direcao
+    bge t5, t1, AA2_INVERTE_ESQ
+    ble t5, t0, AA2_INVERTE_DIR
+    j AA2_SALVA_X
+AA2_INVERTE_ESQ:
+    li t6, -1
+    sw t6, 12(s3)
+    mv t5, t1
+    j AA2_SALVA_X
+AA2_INVERTE_DIR:
+    li t6, 1
+    sw t6, 12(s3)
+    mv t5, t0
+AA2_SALVA_X:
+    # impede de sair pelo lado esquerdo do mapa
+    bge t5, zero, AA2_CHECA_MAX_MAPA
+    li t5, 0
+    li t6, 1                    # inverte direção para direita
+    sw t6, 12(s3)
+    j AA2_STORE
+AA2_CHECA_MAX_MAPA:
+    # impede de sair pelo lado direito do mapa
+    li t6, PLAYER_X_MAX
+    ble t5, t6, AA2_STORE
+    li t5, PLAYER_X_MAX
+    li t6, -1                   # inverte direção para esquerda
+    sw t6, 12(s3)
+AA2_STORE:
+    sw t5, 0(s3)
+AA2_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_ANDADOR
+    addi t3, t3, 1
+    j AA2_LOOP
+AA2_FIM:
+    # atualiza animacao (mesmo timer das plantas)
+    la t0, ANDADOR_TIMER
+    lw t1, 0(t0)
+    addi t1, t1, 1
+    li t2, 8
+    blt t1, t2, AA2_SALVA_TIMER
+    li t1, 0
+    la t2, ANDADOR_FRAME
+    lw t3, 0(t2)
+    xori t3, t3, 1
+    sw t3, 0(t2)
+AA2_SALVA_TIMER:
+    sw t1, 0(t0)
+    ret
+#-----------------------------------------------------------
+# DESENHA ANDADORES
+#-----------------------------------------------------------
+DESENHA_ANDADORES:
+    addi sp, sp, -12
+    sw ra, 0(sp)
+    sw s2, 4(sp)
+    sw s3, 8(sp)
+
+    la t0, NUM_ANDADORES
+    lw s2, 0(t0)
+    la s3, ANDADORES
+    li t3, 0
+
+DA_LOOP:
+    beq t3, s2, DA_FIM
+
+    lw t4, 8(s3)
+    beqz t4, DA_PROXIMA       # morto não desenha
+
+    lw t5, 0(s3)              # x mundo
+    la t6, CAMERA_X
+    lw t6, 0(t6)
+    sub a1, t5, t6            # x tela
+
+    bltz a1, DA_PROXIMA
+    li t5, TELA_LARGURA
+    bge a1, t5, DA_PROXIMA
+
+    lw a2, 4(s3)              # y
+
+  la t5, ANDADOR_FRAME
+    lw t6, 0(t5)              # frame (0 ou 1)
+    lw t5, 12(s3)             # direcao (1=direita, -1=esquerda)
+    bgtz t5, DA_DIREITA
+
+    # esquerda
+    beqz t6, DA_FRAME0_ESQ
+    la a0, inimigoL2
+    j DA_DESENHA
+DA_FRAME0_ESQ:
+    la a0, inimigoL1
+    j DA_DESENHA
+
+DA_DIREITA:
+    beqz t6, DA_FRAME0_DIR
+    la a0, inimigoR2
+    j DA_DESENHA
+DA_FRAME0_DIR:
+    la a0, inimigoR1
+
+DA_DESENHA:
+    mv a3, s1
+    li a4, 199
+    call PRINT_PERSONAGEM
+
+DA_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_ANDADOR
+    addi t3, t3, 1
+    j DA_LOOP
+
+DA_FIM:
+    lw ra, 0(sp)
+    lw s2, 4(sp)
+    lw s3, 8(sp)
+    addi sp, sp, 12
+    ret
+
+#-----------------------------------------------------------
+# CHECA COLISAO JOGADOR COM ANDADORES
+#-----------------------------------------------------------
+CHECA_COLISAO_ANDADORES:
+    addi sp, sp, -4
+    sw ra, 0(sp)
+
+    la t0, INVENCIVEL_TIMER
+    lw t1, 0(t0)
+    bnez t1, CCA_FIM          # invencivel, pula
+
+    la t0, NUM_ANDADORES
+    lw s2, 0(t0)
+    la s3, ANDADORES
+    li t3, 0
+
+CCA_LOOP:
+    beq t3, s2, CCA_FIM
+
+    lw t4, 8(s3)
+    beqz t4, CCA_PROXIMA
+
+    # eixo X
+    lw t5, 0(s3)
+    la t0, PLAYER_X
+    lw t6, 0(t0)
+
+    addi t4, t5, 48
+    bge t6, t4, CCA_PROXIMA
+
+    addi t4, t6, 48
+    ble t4, t5, CCA_PROXIMA
+
+    # eixo Y
+    lw t5, 4(s3)
+    la t0, PLAYER_Y
+    lw t6, 0(t0)
+
+    addi t4, t5, 48
+    bge t6, t4, CCA_PROXIMA
+
+    addi t4, t6, 48
+    ble t4, t5, CCA_PROXIMA
+
+    # colidiu - mesma logica da planta
+    la t0, VIDAS
+    lw t1, 0(t0)
+    beqz t1, CCA_FIM
+    addi t1, t1, -1
+    sw t1, 0(t0)
+
+    call CHECA_GAME_OVER
+
+    la t0, INVENCIVEL_TIMER
+    li t1, 30
+    sw t1, 0(t0)
+
+    la t0, PLAYER_X
+    lw t1, 0(t0)
+    la t2, DIRECAO_ATUAL
+    lw t2, 0(t2)
+    bgtz t2, CCA_RECUA_ESQ
+    addi t1, t1, 40
+    j CCA_SALVA_RECUO
+CCA_RECUA_ESQ:
+    addi t1, t1, -40
+CCA_SALVA_RECUO:
+    bge t1, zero, CCA_OK_MIN
+    li t1, 0
+CCA_OK_MIN:
+    sw t1, 0(t0)
+    j CCA_FIM
+
+CCA_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_ANDADOR
+    addi t3, t3, 1
+    j CCA_LOOP
+
+CCA_FIM:
+    lw ra, 0(sp)
+    addi sp, sp, 4
+    ret
+
+#-----------------------------------------------------------
+# CHECA SOCO COM PLANTAS
+#-----------------------------------------------------------
+CHECA_SOCO_PLANTAS:
+    # só checa se estiver atacando com soco
+    la t0, ATACANDO
+    lw t1, 0(t0)
+    beqz t1, CSP_FIM
+
+    la t0, ARMA_ATUAL
+    lw t1, 0(t0)
+    beqz t1, CSP_FIM          # arma = 0 (tiro) -> não é soco
+
+    # calcula hitbox do soco
+    # se FACING = 1 (direita): hitbox começa em PLAYER_X + 48
+    # se FACING = -1 (esquerda): hitbox começa em PLAYER_X - 24
+    la t0, PLAYER_X
+    lw t3, 0(t0)
+    la t0, FACING
+    lw t4, 0(t0)
+    bgtz t4, CSP_DIR
+
+    # esquerda: hitbox de PLAYER_X-24 até PLAYER_X
+    addi t3, t3, -24          # t3 = soco_x
+    li t4, 24                 # t4 = largura da hitbox
+    j CSP_CHECA
+
+CSP_DIR:
+    # direita: hitbox de PLAYER_X+48 até PLAYER_X+72
+    addi t3, t3, 48           # t3 = soco_x
+    li t4, 24                 # t4 = largura da hitbox
+
+CSP_CHECA:
+    # t3 = soco_x, t4 = largura hitbox
+    la t0, PLAYER_Y
+    lw t5, 0(t0)              # t5 = soco_y (mesma altura do personagem)
+    li t6, 48                 # altura da hitbox
+
+    la s4, NUM_PLANTAS
+    lw s2, 0(s4)
+    la s3, PLANTAS
+    li s4, 0                  # contador
+
+CSP_LOOP:
+    beq s4, s2, CSP_FIM
+
+    lw a0, 8(s3)              # vida da planta
+    beqz a0, CSP_PROXIMA
+
+    # eixo X
+    lw a1, 0(s3)              # planta x
+    add a2, t3, t4            # soco_x + largura
+    ble a2, a1, CSP_PROXIMA   # soco termina antes da planta
+
+    addi a2, a1, 24           # planta x + largura
+    ble a2, t3, CSP_PROXIMA   # planta termina antes do soco
+
+    # eixo Y
+    lw a1, 4(s3)              # planta y
+    add a2, t5, t6            # soco_y + altura
+    ble a2, a1, CSP_PROXIMA
+
+    addi a2, a1, 32           # planta y + altura
+    ble a2, t5, CSP_PROXIMA
+
+    # acertou
+    lw a0, 8(s3)
+    addi a0, a0, -1
+    sw a0, 8(s3)
+
+CSP_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_PLANTA
+    addi s4, s4, 1
+    j CSP_LOOP
+
+CSP_FIM:
+    ret
+
+#-----------------------------------------------------------
+# CHECA SOCO COM ANDADORES
+#-----------------------------------------------------------
+CHECA_SOCO_ANDADORES:
+    la t0, ATACANDO
+    lw t1, 0(t0)
+    beqz t1, CSA_FIM
+
+    la t0, ARMA_ATUAL
+    lw t1, 0(t0)
+    beqz t1, CSA_FIM
+
+    # mesma hitbox do soco
+    la t0, PLAYER_X
+    lw t3, 0(t0)
+    la t0, FACING
+    lw t4, 0(t0)
+    bgtz t4, CSA_DIR
+
+    addi t3, t3, -24
+    li t4, 24
+    j CSA_CHECA
+
+CSA_DIR:
+    addi t3, t3, 48
+    li t4, 24
+
+CSA_CHECA:
+    la t0, PLAYER_Y
+    lw t5, 0(t0)
+    li t6, 48
+
+    la s4, NUM_ANDADORES
+    lw s2, 0(s4)
+    la s3, ANDADORES
+    li s4, 0
+
+CSA_LOOP:
+    beq s4, s2, CSA_FIM
+
+    lw a0, 8(s3)
+    beqz a0, CSA_PROXIMA
+
+    # eixo X
+    lw a1, 0(s3)
+    add a2, t3, t4
+    ble a2, a1, CSA_PROXIMA
+
+    addi a2, a1, 48
+    ble a2, t3, CSA_PROXIMA
+
+    # eixo Y
+    lw a1, 4(s3)
+    add a2, t5, t6
+    ble a2, a1, CSA_PROXIMA
+
+    addi a2, a1, 48
+    ble a2, t5, CSA_PROXIMA
+
+    # acertou
+    lw a0, 8(s3)
+    addi a0, a0, -1
+    sw a0, 8(s3)
+
+CSA_PROXIMA:
+    addi s3, s3, TAM_INIMIGO_ANDADOR
+    addi s4, s4, 1
+    j CSA_LOOP
+
+CSA_FIM:
+    ret
     
 .data
 .include "SYSTEMv24.s"
