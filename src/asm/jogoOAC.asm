@@ -1729,46 +1729,54 @@ ATUALIZA_ANDADORES:
     lw s2, 0(t0)
     la s3, ANDADORES
     li t3, 0
-
 AA2_LOOP:
     beq t3, s2, AA2_FIM
-
     lw t4, 8(s3)              # vida
-    beqz t4, AA2_PROXIMA
-
-    lw s4, 0(s3)              # x atual         → s4 (não vai ser sobrescrito)
-    lw s5, 12(s3)             # direcao         → s5
-    lw s6, 16(s3)             # x_min           → s6
-    li s7, 100
-    add s7, s6, s7            # x_max = x_min + 100 → s7
-
-    # move 2px por tick
-    add s4, s4, s5
-    add s4, s4, s5
-
-    # checa limite direito da patrulha
-    blt s4, s7, AA2_CHECA_ESQ
-    mv s4, s7
-    li s5, -1
-    sw s5, 12(s3)
+    beqz t4, AA2_PROXIMA      # morto, pula
+    lw t5, 0(s3)              # x atual
+    lw t6, 12(s3)             # direcao (1 ou -1)
+    lw t0, 16(s3)             # x_min da patrulha
+    li t1, 100                # tamanho da patrulha (x_min + 100 = x_max)
+    add t1, t0, t1            # t1 = x_max
+    # move
+    add t5, t5, t6            # x += direcao (velocidade 1)
+    
+    add t5, t5, t6
+    # checa limites e inverte direcao
+    bge t5, t1, AA2_INVERTE_ESQ
+    ble t5, t0, AA2_INVERTE_DIR
+    j AA2_SALVA_X
+AA2_INVERTE_ESQ:
+    li t6, -1
+    sw t6, 12(s3)
+    mv t5, t1
+    j AA2_SALVA_X
+AA2_INVERTE_DIR:
+    li t6, 1
+    sw t6, 12(s3)
+    mv t5, t0
+AA2_SALVA_X:
+    # impede de sair pelo lado esquerdo do mapa
+    bge t5, zero, AA2_CHECA_MAX_MAPA
+    li t5, 0
+    li t6, 1                    # inverte direção para direita
+    sw t6, 12(s3)
     j AA2_STORE
-
-AA2_CHECA_ESQ:
-    # checa limite esquerdo da patrulha
-    bgt s4, s6, AA2_STORE
-    mv s4, s6
-    li s5, 1
-    sw s5, 12(s3)
-
+AA2_CHECA_MAX_MAPA:
+    # impede de sair pelo lado direito do mapa
+    li t6, PLAYER_X_MAX
+    ble t5, t6, AA2_STORE
+    li t5, PLAYER_X_MAX
+    li t6, -1                   # inverte direção para esquerda
+    sw t6, 12(s3)
 AA2_STORE:
-    sw s4, 0(s3)              # salva x atualizado
-
+    sw t5, 0(s3)
 AA2_PROXIMA:
     addi s3, s3, TAM_INIMIGO_ANDADOR
     addi t3, t3, 1
     j AA2_LOOP
-
 AA2_FIM:
+    # atualiza animacao (mesmo timer das plantas)
     la t0, ANDADOR_TIMER
     lw t1, 0(t0)
     addi t1, t1, 1
@@ -1782,7 +1790,6 @@ AA2_FIM:
 AA2_SALVA_TIMER:
     sw t1, 0(t0)
     ret
-    
 #-----------------------------------------------------------
 # DESENHA ANDADORES
 #-----------------------------------------------------------
