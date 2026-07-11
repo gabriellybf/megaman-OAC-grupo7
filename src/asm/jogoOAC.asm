@@ -5,7 +5,7 @@
 # Numero de Notas a tocar
 pulaL: .string "\n"
 NUM: .word 125
-# lista de nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,nota,duraï¿½ï¿½o,...
+# lista de nota,duração,nota,duração,nota,duração,...
 NOTAS: 60,1150,48,115,48,57,48,57,48,1150,48,115,48,57,48,57,48,230,43,230,53,230,55,230,53,230,65,230,67,230,65,230,53,230,55,230,48,230,65,230,67,230,65,230,55,230,59,690,67,230,60,115,60,115,60,230,55,230,55,230,55,230
 60,1200,67,1200,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,65,250,62,1500,55,50,55,100,55,100,60,1200,67,1200,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,62,200,72,1200,67,600,65,200,64,200,65,200,62,1200,55,200,55,200,55,200
 57,927,57,309,65,309,64,309,62,309,60,309,60,206,62,206,64,206,62,412,57,206,59,618,55,412,55,206,57,1236,65,309,64,309,62,309,60,309,67,618,62,1545,55,309,57,1236,65,309,64,309,62,309,60,309,60,206,62,206,64,206,62,412,57,206,59,618,67,412,67,206,72,412,71,206,69,412,67,206,65,412,64,206,62,412,60,206,67,618,43,412,43,103,43,103,43,618,55,309,55,103,55,103,55,103,57,927,60,309,65,618,62,618
@@ -28,6 +28,18 @@ FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o perso
 ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
 ANIM_FRAME:   .word 0        # 0 ou 1 - qual dos 2 frames da animação atual está ativo
 .eqv ANIM_VELOCIDADE, 6      # troca de frame a cada 6 iterações do GAME_LOOP (ajuste pra mais rápido/devagar)
+# ---- ataques ----
+ARMA_ATUAL:   .word 0        # 0 = projétil (tiro), 1 = soco (melee) - trocado com a tecla Q
+ATACANDO:     .word 0        # 1 enquanto a pose/animação de ataque está tocando
+ATAQUE_TIMER: .word 0        # contador regressivo da duração do ataque atual
+.eqv ATAQUE_DURACAO, 10       # quantos ciclos do GAME_LOOP a pose de ataque fica na tela
+TIRO_ATIVO:    .word 0        # 1 = tem projétil voando na tela agora
+TIRO_X:        .word 0        # posição do projétil no MUNDO (mesmo sistema do PLAYER_X)
+TIRO_Y:        .word 0        # posição vertical do projétil na tela
+TIRO_DIRECAO:  .word 1        # direção que o projétil está viajando (1 = direita, -1 = esquerda)
+TIRO_DIST:     .word 0        # quantos pixels o projétil já percorreu desde que foi disparado
+.eqv TIRO_VELOCIDADE, 8       # <-- CONTROLA A VELOCIDADE: pixels que o projétil anda por ciclo (aumente pra ele ir mais rápido)
+.eqv TIRO_ALCANCE, 150        # <-- CONTROLA A DURAÇÃO/ALCANCE: quantos pixels o projétil viaja até sumir (aumente pra ele ir mais longe)
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -47,8 +59,14 @@ ANIM_FRAME:   .word 0        # 0 ou 1 - qual dos 2 frames da animação atual es
 .include "script/Imagens/imagens_convertidas/arquivos .data/RunL2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/Jump-2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/Jump-1.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/TiroL.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/TiroR.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/socoesq.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/socodir.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/fire.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/coracao.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/cura.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/fireesq.data"
 .include "MACROSv24.s"
 
 
@@ -73,14 +91,14 @@ MENU:
     	li s0, 1
     	li t0, 0xFF200604
     	sw s0, 0(t0)
-       	la s0,NUM		# define o endereï¿½o do nï¿½mero de notas
+       	la s0,NUM		# define o endereço do numero de notas
 	lw s1,0(s0)		# le o numero de notas
-	la s0,NOTAS		# define o endereï¿½o das notas
+	la s0,NOTAS		# define o endereço das notas
 	li t0,0			# zera o contador de notas
 	li a2,68		# define o instrumento
 	li a3,127		# define o volume
 
-LOOP:	beq t0,s1, FIMmusic		# contador chegou no final? entï¿½o  vï¿½ para FIM
+LOOP:	beq t0,s1, FIMmusic		# contador chegou no final? entao va para FIM
 	lw a0,0(s0)		# le o valor da nota
 	lw a1,4(s0)		# le a duracao da nota
 	li a7,31		# define a chamada de syscall
@@ -98,10 +116,10 @@ MUSIC_WAIT:
 SEM_TECLA:
     	addi t1, t1, -1
     	bnez t1, MUSIC_WAIT
-    	mv a0,a1		# passa a duraï¿½ï¿½o da nota para a pausa
+    	mv a0,a1		# passa a duração da nota para a pausa
 	li a7,32		# define a chamada de syscal 
 	ecall			# realiza uma pausa de a0 ms
-	addi s0,s0,8		# incrementa para o endereï¿½o da prï¿½xima nota
+	addi s0,s0,8		# incrementa para o endereço da proxima nota
 	addi t0,t0,1		# incrementa o contador de notas
 	j LOOP			# volta ao loop
 	
@@ -224,7 +242,7 @@ PJ_COPIA:
 # LIMPA O FRAME 1
 # ---------------------------------------------------------
 LIMPAR_FRAME_1:
-    	li t0, 0xFF100000      # EndereÃ§o base do frame 1
+    	li t0, 0xFF100000      # Endereço base do frame 1
     	li t1, 19200           # 320x240 / 4 (pois usamos sw)
     	li t2, 0x00000000      # Cor preta
 CLEAR_LOOP:
@@ -313,7 +331,7 @@ GAME_LOOP:
 	mv a3, s1
 	call PRINT_JANELA
 
-	# desenha o personagem já animado (corrida/pulo escolhidos em ESCOLHE_SPRITE)
+	# desenha o personagem já animado (corrida/pulo/ataque escolhidos em ESCOLHE_SPRITE)
 	call ATUALIZA_ANIMACAO
 	call ESCOLHE_SPRITE        # a0 já vem com o sprite certo escolhido
 	la t0, PLAYER_X
@@ -326,6 +344,8 @@ GAME_LOOP:
 	mv a3, s1
 	li a4, 199
 	call PRINT_PERSONAGEM
+	call ATUALIZA_ATAQUE
+	call DESENHA_TIRO
 	call DESENHA_POWERUP
 	call DESENHA_HUD 
 	# troca o frame exibido
@@ -356,7 +376,11 @@ MOVIMENTACAO:
 	beq t2, t3, GL_ESQUERDA
 	li t3, 'w'
 	beq t2, t3, GL_PULA
-	j MV_PARADO                # tecla lida não é d/a/w -> também é "parado"
+	li t3, 'e'
+	beq t2, t3, GL_ATAQUE
+	li t3, 'q'
+	beq t2, t3, GL_TROCA_ARMA
+	j MV_PARADO                # tecla lida não é d/a/w/e/q -> também é "parado"
 
 GL_DIREITA:
 	la t4, PLAYER_X
@@ -405,6 +429,50 @@ GL_PULA:
 	li t6, 3                        # velocidade horizontal do pulo
 	mul t5, t5, t6
 	la t4, VEL_X_PULO
+	sw t5, 0(t4)
+	j MV_GRAVIDADE
+
+GL_ATAQUE:
+	la t4, ATAQUE_TIMER
+	lw t5, 0(t4)
+	bnez t5, MV_GRAVIDADE          # já tem um ataque tocando -> ignora tecla nova
+
+	li t5, ATAQUE_DURACAO
+	sw t5, 0(t4)
+	la t4, ATACANDO
+	li t5, 1
+	sw t5, 0(t4)
+
+	la t4, ARMA_ATUAL
+	lw t5, 0(t4)
+	bnez t5, MV_GRAVIDADE            # arma = 1 (soco) -> só a pose já resolve, sem projétil
+
+	# arma = 0 (projétil) -> dispara um tiro, se não houver outro na tela
+	la t4, TIRO_ATIVO
+	lw t6, 0(t4)
+	bnez t6, MV_GRAVIDADE             # já tem projétil voando -> não dispara outro
+	li t6, 1
+	sw t6, 0(t4)
+	la t4, PLAYER_X
+	lw t6, 0(t4)
+	la t4, TIRO_X
+	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL X: o projétil nasce na posição atual do personagem
+	la t4, PLAYER_Y
+	lw t6, 0(t4)
+	la t4, TIRO_Y
+	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL Y: o projétil nasce na mesma altura do personagem
+	la t4, FACING
+	lw t6, 0(t4)
+	la t4, TIRO_DIRECAO
+	sw t6, 0(t4)                       # <-- DIREÇÃO DO PROJÉTIL: copia o FACING (lado que o personagem está olhando)
+	la t4, TIRO_DIST
+	sw zero, 0(t4)                     # <-- ZERA A DISTÂNCIA PERCORRIDA (começa a contar do zero pro alcance máximo)
+	j MV_GRAVIDADE
+
+GL_TROCA_ARMA:
+	la t4, ARMA_ATUAL
+	lw t5, 0(t4)
+	xori t5, t5, 1                  # alterna entre 0 (projétil) e 1 (soco)
 	sw t5, 0(t4)
 	j MV_GRAVIDADE
 MV_PARADO:
@@ -501,10 +569,120 @@ AA_SALVA:
 	sw t1, 0(t0)
 	ret
 #---------------------------------------------------------------------------
+#         ATUALIZA_ATAQUE - conta o tempo da pose de ataque e move o projétil
+#---------------------------------------------------------------------------
+ATUALIZA_ATAQUE:
+	# --- timer da pose de ataque (soco/tiro) ---
+	la t0, ATAQUE_TIMER
+	lw t1, 0(t0)
+	beqz t1, AT_TIRO
+	addi t1, t1, -1
+	sw t1, 0(t0)
+	bnez t1, AT_TIRO
+	la t0, ATACANDO
+	sw zero, 0(t0)                  # pose de ataque terminou
+
+AT_TIRO:
+	la t0, TIRO_ATIVO
+	lw t1, 0(t0)
+	beqz t1, AT_FIM
+
+	# <-- AQUI A POSIÇÃO É ATUALIZADA: TIRO_X += TIRO_VELOCIDADE * TIRO_DIRECAO (roda a cada ciclo do GAME_LOOP)
+	la t0, TIRO_DIRECAO
+	lw t2, 0(t0)
+	li t3, TIRO_VELOCIDADE
+	mul t2, t2, t3
+	la t0, TIRO_X
+	lw t4, 0(t0)
+	add t4, t4, t2
+	sw t4, 0(t0)
+
+	# <-- AQUI A DURAÇÃO/ALCANCE É CONTROLADA: soma a distância percorrida e compara com TIRO_ALCANCE
+	la t0, TIRO_DIST
+	lw t5, 0(t0)
+	li t6, TIRO_VELOCIDADE
+	add t5, t5, t6
+	sw t5, 0(t0)
+	li t6, TIRO_ALCANCE
+	blt t5, t6, AT_FIM               # ainda não chegou no alcance máximo -> continua voando
+
+	# passou do alcance -> projétil desativado (some da tela, libera pra atirar de novo)
+	la t0, TIRO_ATIVO
+	sw zero, 0(t0)
+	la t0, TIRO_DIST
+	sw zero, 0(t0)
+AT_FIM:
+	ret
+#---------------------------------------------------------------------------
+#         DESENHA_TIRO - desenha o projétil na tela, se estiver ativo
+#---------------------------------------------------------------------------
+DESENHA_TIRO:
+	addi sp, sp, -4
+	sw ra, 0(sp)            
+
+	la t0, TIRO_ATIVO
+	lw t1, 0(t0)
+	beqz t1, DT_FIM
+
+	la t0, TIRO_DIRECAO
+	lw t1, 0(t0)
+	bgtz t1, DT_DIR
+	la a0, fireesq       
+	j DT_POS
+DT_DIR:
+	la a0, fire
+DT_POS:
+	la t0, TIRO_X
+	lw t1, 0(t0)
+	la t0, CAMERA_X
+	lw t2, 0(t0)
+	sub a1, t1, t2
+	bltz a1, DT_FIM
+	li t5, TELA_LARGURA
+	bge a1, t5, DT_FIM
+	la t0, TIRO_Y
+	lw a2, 0(t0)
+	mv a3, s1
+	li a4, 199
+	call PRINT_PERSONAGEM
+DT_FIM:
+	lw ra, 0(sp)              
+	addi sp, sp, 4
+	ret
+#---------------------------------------------------------------------------
 #         ESCOLHE_SPRITE - decide qual sprite desenhar
 #         retorna o endereço do sprite escolhido em a0
 #---------------------------------------------------------------------------
 ESCOLHE_SPRITE:
+	# se estiver atacando, a pose de ataque tem prioridade sobre corrida/pulo/parado
+	la t0, ATACANDO
+	lw t1, 0(t0)
+	beqz t1, ES_CHECA_PULO
+	la t0, ARMA_ATUAL
+	lw t2, 0(t0)
+	bnez t2, ES_POSE_SOCO           # arma = 1 (soco) -> pula pra pose de soco
+
+	# arma = 0 (projétil) -> personagem mostra pose de ATIRANDO
+	la t0, FACING
+	lw t3, 0(t0)
+	bgtz t3, ES_ATIRA_DIR
+	la a0, TiroL    
+	ret
+ES_ATIRA_DIR:
+	la a0, TiroR     
+	ret
+
+ES_POSE_SOCO:
+	la t0, FACING
+	lw t3, 0(t0)
+	bgtz t3, ES_SOCO_DIR
+	la a0, socoesq    
+	ret
+ES_SOCO_DIR:
+	la a0, socodir     
+	ret
+
+ES_CHECA_PULO:
 	la t0, PULANDO
 	lw t1, 0(t0)
 	bnez t1, ES_PULO
@@ -540,24 +718,12 @@ ES_ESQ1:
 	ret
 
 ES_PULO:
-	la t0, FACING
+	la t0, ANIM_FRAME
 	lw t1, 0(t0)
-	la t2, ANIM_FRAME
-	lw t3, 0(t2)
-	bgtz t1, ES_PULO_DIR
-	j ES_PULO_ESQ
-ES_PULO_DIR:
-	beqz t3, ES_PULO_DIR1
+	beqz t1, ES_PULO1
 	la a0, Jump2
 	ret
-ES_PULO_DIR1:
-	la a0, Jump1
-	ret
-ES_PULO_ESQ:
-	beqz t3, ES_PULO_ESQ1
-	la a0, Jump2
-	ret
-ES_PULO_ESQ1:
+ES_PULO1:
 	la a0, Jump1
 	ret
 #---------------------------------------------------------------------------
