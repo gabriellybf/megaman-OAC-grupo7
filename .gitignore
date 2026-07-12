@@ -16,4 +16,4 @@ ehthumbs.db
 .DS_Store
 
 # Dados convertidos (gerados pelo script.exe a partir dos BMPs)
-src/asm/script/Imagens/imagens_convertidas/
+#src/asm/script/Imagens/imagens_convertidas/
