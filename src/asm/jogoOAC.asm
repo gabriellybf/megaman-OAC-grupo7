@@ -10,10 +10,12 @@ NOTAS_1: .word 60,166,64,83,64,83,64,166,64,83,64,83,64,166,60,332,60,83,60,83,6
 # ======== MUSICA MARIO
 NUM_2: .word 41
 NOTAS_2: .word 76,150,76,300,76,300,72,150,76,300,79,600,55,600,72,450,67,450,64,450,69,300,71,300,70,150,69,300,67,201,76,197,79,201,81,300,77,150,79,300,76,300,72,150,74,150,71,450,72,450,67,450,64,450,69,300,71,300,70,150,69,300,67,201,76,198,79,201,81,300,77,150,79,300,76,300,72,150,74,150,71,150
-# ======== MUSICA GAME LOOP ===========
-
+# ======== MUSICA FASE 1===========
 NUM_3: .word 42
 NOTAS_3: .word 72,211,83,139,72,143,83,562,81,634,74,211,84,139,74,143,84,562,83,634,72,211,83,139,72,143,83,562,81,423,84,283,81,279,77,283,76,423,74,634,72,211,83,139,72,143,83,562,81,634,74,211,84,139,74,143,84,562,83,634,72,211,83,139,72,143,83,562,81,423,74,210,76,211,77,211,79,422,91,105,93,105,91,317
+# ======== MUSICA FASE 2 ==========
+NUM_4: .word 64
+NOTAS_4: .word 55,999,53,166,59,333,57,333,55,333,57,333,55,1165,53,166,59,333,57,333,55,333,57,333,52,832,52,166,53,166,55,166,50,1332,60,332,60,166,67,166,71,166,70,499,60,332,60,166,67,166,71,166,73,332,71,166,72,832,72,333,71,166,72,332,76,499,79,166,77,166,76,166,74,166,72,666,72,333,71,166,72,332,76,499,76,166,77,166,76,333,74,666,74,166,72,166,71,166,79,499,77,333,76,333,74,333,74,166,76,166,74,166,72,666,60,332,60,166,67,166,71,166,73,332,71,166,72,166
 pulaL: .string "\n"
 
 # --- Variáveis para música assíncrona ---
@@ -233,18 +235,26 @@ TOCA_MUSICA:
     lw t2, 0(t1)              # t2 = tempo agendado para a próxima nota
     bltu t0, t2, FIM_TOCA_MUSICA # Se tempo_atual < tempo_agendado, sai
 
-# 3. Descobre qual música está tocando (1, 2 ou 3)
+# 3. Descobre qual música está tocando (1, 2, 3, 4)
     la t3, FAIXA_ATUAL
     lw t4, 0(t3)
     li t5, 1
     beq t4, t5, CARREGA_FAIXA_1
     li t5, 2
     beq t4, t5, CARREGA_FAIXA_2
+    li t5, 4
+    beq t4, t5, CARREGA_FAIXA_4
 
 CARREGA_FAIXA_3:
     la t1, NUM_3
     lw a5, 0(t1)              # Total de notas da música 3
     li a2, 11                
+    j VERIFICA_FIM_MUSICA
+
+CARREGA_FAIXA_4:
+    la t1, NUM_4
+    lw a5, 0(t1)              # Total de notas da música 4
+    li a2, 81                 # Instrumento: Synth (diferente da Fase 1)
     j VERIFICA_FIM_MUSICA
 
 CARREGA_FAIXA_1:
@@ -275,10 +285,18 @@ VERIFICA_FIM_MUSICA:
     beq t4, t5, TROCA_PARA_2  # Se for 1, vai pra 2
     li t5, 2
     beq t4, t5, TROCA_PARA_1  # Se for 2, volta pra 1
+    li t5, 4
+    beq t4, t5, REINICIA_4    # Se for 4, repete a 4
 
 REINICIA_3:                   # Se for 3, repete a 3 infinitamente
     la t1, NOTA_ATUAL_PTR
     la t2, NOTAS_3
+    sw t2, 0(t1)
+    j FIM_TOCA_MUSICA
+
+REINICIA_4:                   # Se for 4, repete a 4 infinitamente
+    la t1, NOTA_ATUAL_PTR
+    la t2, NOTAS_4
     sw t2, 0(t1)
     j FIM_TOCA_MUSICA
 
@@ -1624,6 +1642,20 @@ CARREGA_FASE2:
     call PRINT
     li a3, 1
     call PRINT
+
+    la t0, FAIXA_ATUAL
+    li t1, 4               # Define que agora toca a faixa 4
+    sw t1, 0(t0)           
+    
+    la t0, NOTAS_TOCADAS
+    sw zero, 0(t0)         # Zera o contador de notas
+    
+    la t0, NOTA_ATUAL_PTR
+    la t1, NOTAS_4
+    sw t1, 0(t0)           # Aponta para a nova música
+    
+    la t0, PROX_NOTA_TEMPO
+    sw zero, 0(t0)         # Zera o timer para tocar instantaneamente
 
     lw ra, 0(sp)
     addi sp, sp, 4
