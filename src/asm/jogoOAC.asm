@@ -10,6 +10,10 @@ NOTAS_1: 60,166,64,83,64,83,64,166,64,83,64,83,64,166,60,332,60,83,60,83,64,166,
 # ======== MUSICA MARIO
 NUM_2: .word 41
 NOTAS_2:  76,150,76,300,76,300,72,150,76,300,79,600,55,600,72,450,67,450,64,450,69,300,71,300,70,150,69,300,67,201,76,197,79,201,81,300,77,150,79,300,76,300,72,150,74,150,71,450,72,450,67,450,64,450,69,300,71,300,70,150,69,300,67,201,76,198,79,201,81,300,77,150,79,300,76,300,72,150,74,150,71,150
+# ======== MUSICA GAME LOOP ===========
+NUM_3: .word 4
+NOTAS_3: 60,250, 64,250, 67,250, 72,500
+
 # ---- estado do jogo ----
 PLAYER_X:     .word 0        # posição do personagem no MUNDO (0 .. MAP_LARGURA-LARG_PERSONAGEM)
 PLAYER_Y:     .word 145      # posição vertical na tela (0 .. 240-ALT_PERSONAGEM)
@@ -20,6 +24,11 @@ VEL_Y:        .word 0        # velocidade vertical atual
 DIRECAO_ATUAL: .word 0        # -1 = esquerda, 0 = parado, 1 = direita
 VEL_X_PULO:    .word 0        # impulso horizontal guardado no momento do salto
 
+# --- Variáveis para música assíncrona ---
+PROX_NOTA_TEMPO: .word 0         # Tempo exato (em ms) para tocar a próxima nota
+NOTA_ATUAL_PTR:  .word NOTAS_1   # Ponteiro para a nota atual no array (Padrão: Fase 1)
+NOTAS_TOCADAS:   .word 0         # Contador de notas já tocadas
+FAIXA_ATUAL:     .word 1         # 1 = Mega Man, 2 = Mario
  
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
@@ -56,90 +65,113 @@ MENU:
 		li t0, 0xFF200604
 		li t1, 1
 		sw t1, 0(t0)
+
+		j KEY_MENU
 #-------------------------------------------------------------
 #                          MÚSICA
 #-------------------------------------------------------------
- MAIN_MUSIC:
-    # -------------------------------------------------
-    # ATAQUE 1: MEGA MAN
-    # -------------------------------------------------
-    la a0, NOTAS_1       # Endereço das notas
-    la t0, NUM_1        # define o endereço do numero de notas
-    lw a1, 0(t0)            # le o numero de notas
-    li a2, 80               # define o instrumento
-    li a3, 127              # define o volume
-	li a4, 1				# define velocidade
-    jal ra, TOCA_TRECHO     # Pula para a função e salva o retorno
+TOCA_MUSICA:
+    # 1. Lê o tempo atual do sistema em milissegundos
+    li a7, 30
+    ecall
+    mv t0, a0                 # t0 recebe o tempo atual (low bits)
 
-    # -------------------------------------------------
-    # CONTRA-ATAQUE 1: MARIO
-    # -------------------------------------------------
-    la a0, NOTAS_2    # Endereço das notas
-    la t0, NUM_2        # define o endereço do numero de notas
-    lw a1, 0(t0)            # le o numero de notas
-    li a2, 12               # Instrumento MIDI (Marimba)
-    li a3, 127              # define o volume
-	li a4, 1				# define velocidade
-    jal ra, TOCA_TRECHO      # Pula para a função e salva o retorno
+    # 2. Verifica se já está na hora de tocar a próxima nota
+    la t1, PROX_NOTA_TEMPO
+    lw t2, 0(t1)              # t2 = tempo agendado para a próxima nota
+    bltu t0, t2, FIM_TOCA_MUSICA # Se tempo_atual < tempo_agendado, sai
 
-    j FIMmusic              # Terminou o duelo
+# 3. Descobre qual música está tocando (1, 2 ou 3)
+    la t3, FAIXA_ATUAL
+    lw t4, 0(t3)
+    li t5, 1
+    beq t4, t5, CARREGA_FAIXA_1
+    li t5, 2
+    beq t4, t5, CARREGA_FAIXA_2
 
-# ====================================================================
-# SUB-ROTINA: TOCA_TRECHO
-# Parâmetros: 
-# a0 = Endereço base do array de notas
-# a1 = Total de notas a tocar
-# a2 = Instrumento
-# a3 = Volume
-# ====================================================================
-TOCA_TRECHO:
-    mv s0, a0               # s0 = ponteiro do array
-    mv s1, a1               # s1 = limite do contador
-    li t0, 0                # t0 = contador atual
+CARREGA_FAIXA_3:
+    la t1, NUM_3
+    lw a5, 0(t1)              # Total de notas da música 3
+    li a2, 30                 # Instrumento: Distortion Guitar 
+    j VERIFICA_FIM_MUSICA
 
-LOOP_TRECHO:   
-    beq t0, s1, FIM_TRECHO  # Se tocou tudo, sai da função
-    lw a0, 0(s0)            # le o valor da nota
-    lw s2, 4(s0)            # le a duracao (salva em s2 para não perder)
+CARREGA_FAIXA_1:
+    la t1, NUM_1
+    lw a5, 0(t1)              # a5 = total de notas do Mega Man (52)
+    li a2, 80                 # a2 = Instrumento (Square Wave)
+    j VERIFICA_FIM_MUSICA
 
-    mul s2, s2, a4 		# calcula a velocidade
+CARREGA_FAIXA_2:
+    la t1, NUM_2
+    lw a5, 0(t1)              # a5 = total de notas do Mario (41)
+    li a2, 12                 # a2 = Instrumento (Marimba)
 
-    mv a1, s2               # coloca a duração no a1 para a ecall
-    li a7, 31               # ecall para MIDI
-    ecall           
+VERIFICA_FIM_MUSICA:
+    # Verifica se a música atual acabou
+    la t5, NOTAS_TOCADAS
+    lw t6, 0(t5)              # t6 = notas já tocadas
+    blt t6, a5, TOCA_NOTA     # Se ainda tem notas, vai tocar
 
-    # Espera personalizada com checagem de tecla (seu código mantido)
-    li t1, 10
-MUSIC_WAIT:
-    li t2, 0xFF200000       # Endereço KDMMIO
-    lw t3, 0(t2)
-    andi t3, t3, 1
-    beqz t3, SEM_TECLA
-    lw t4, 4(t2)
-    li t5, 's'
-    beq t4, t5, Interrompemusic
-SEM_TECLA:
-    addi t1, t1, -1
-    bnez t1, MUSIC_WAIT
+    # --- LÓGICA DE TROCA DE MÚSICA --------
+    li t6, 0                  # Zera o contador de notas
+	sw t6, 0(t5)
+    
+    la t3, FAIXA_ATUAL
+    lw t4, 0(t3)
+    
+    li t5, 1
+    beq t4, t5, TROCA_PARA_2  # Se for 1, vai pra 2
+    li t5, 2
+    beq t4, t5, TROCA_PARA_1  # Se for 2, volta pra 1
 
-    # Pausa entre notas
-    mv a0, s2               # resgata a duração
-    li a7, 32               # ecall de pausa
-    ecall           
+REINICIA_3:                   # Se for 3, repete a 3 infinitamente
+    la t1, NOTA_ATUAL_PTR
+    la t2, NOTAS_3
+    sw t2, 0(t1)
+    j FIM_TOCA_MUSICA
 
-    addi s0, s0, 8          # vai para a próxima nota (pula 8 bytes)
-    addi t0, t0, 1          # incrementa contador
-    j LOOP_TRECHO          
+TROCA_PARA_2:
+    li t5, 2
+    sw t5, 0(t3)              # FAIXA_ATUAL = 2
+    la t1, NOTA_ATUAL_PTR
+    la t2, NOTAS_2
+    sw t2, 0(t1)
+    j FIM_TOCA_MUSICA
 
-FIM_TRECHO:
-    ret                     # Volta para onde a função foi chamada (jal)
+TROCA_PARA_1:
+    li t5, 1
+    sw t5, 0(t3)              # FAIXA_ATUAL = 1
+    la t1, NOTA_ATUAL_PTR
+    la t2, NOTAS_1
+    sw t2, 0(t1)
+    j FIM_TOCA_MUSICA
 
-PARAmusic:
-    j KEY_MENU
+TOCA_NOTA:
+    # 4. Lê os dados da nota atual no ponteiro
+    la t3, NOTA_ATUAL_PTR
+    lw t4, 0(t3)              # t4 = endereço da nota
+    lw a0, 0(t4)              # a0 = Tom da nota
+    lw a1, 4(t4)              # a1 = Duração da nota
+    
+    # 5. Toca a nota
+    li a3, 120                # a3 = Volume
+    li a7, 31
+    ecall                     # Toca a nota! (o instrumento 'a2' já foi definido lá em cima)
 
-FIMmusic:   
-    j KEY_MENU
+    # 6. Agenda a próxima nota
+    add t2, t0, a1
+    la t1, PROX_NOTA_TEMPO
+    sw t2, 0(t1)              # Salva o novo tempo agendado
 
+    # 7. Atualiza os ponteiros para a próxima passagem
+    addi t4, t4, 8            # Avança 8 bytes no array
+    sw t4, 0(t3)              # Salva o novo ponteiro da nota
+    
+    addi t6, t6, 1            # Incrementa o contador
+    sw t6, 0(t5)              # Salva o novo contador
+
+FIM_TOCA_MUSICA:
+    ret
 #---------------------------------------------------------------------------
 #                     MÉTODO PARA DESENHAR NA TELA
 #---------------------------------------------------------------------------
@@ -300,7 +332,8 @@ LFA_LOOP:
 #	             Controle do MENU
 #-----------------------------------------------------------
 # Loop para aguardar a tecla 's' para iniciar
-KEY_MENU:
+KEY_MENU:	
+		call TOCA_MUSICA
     	li t1, 0xFF200000       # Endereço de controle do KDMMIO
     	lw t6, 0(t1)            # Le bit de Controle Teclado
     	andi t6, t6, 0x0001     # Mascara o bit menos significativo
@@ -308,26 +341,41 @@ KEY_MENU:
     	lw t2, 4(t1)            # Le o valor da tecla
     	li t0, 's'
     	bne t2, t0, KEY_MENU    # Se não for 's', continua no loop
-# Se 's' foi pressionado, limpa a tela e vai para o setup do jogo
+		# Se 's' foi pressionado, limpa a tela e vai para o setup do jogo
 Interrompemusic:
     	call LIMPAR_FRAME_1      # Limpa o frame que estava sendo exibido
     	j Setup
 
 Setup: 
-	#Desenha o mapa nas duas frames
-	la a0, mapaFase1
+	# Desenha o mapa nas duas frames
+		la a0, mapaFase1
     	li a1, 0
     	li a2, 0
     	li a3, 0            # desenha no frame 0
     	call PRINT
     	li a3, 1            # desenha no frame 1
     	call PRINT
+	# logica para musica durante  o jogo
+		la t0, FAIXA_ATUAL
+		li t1, 3
+		sw t1, 0(t0)           # Define que agora toca a faixa 2 (Mario)
+		
+		la t0, NOTAS_TOCADAS
+		sw zero, 0(t0)         # Zera o contador de notas para iniciar certo
+		
+		la t0, NOTA_ATUAL_PTR
+		la t1, NOTAS_3
+		sw t1, 0(t0)           # Aponta o ponteiro para a música 2
+		
+		la t0, PROX_NOTA_TEMPO
+		sw zero, 0(t0)         # Zera o timer para a música tocar instantaneamente
     	j GAME_LOOP
 #---------------------------------------------------------------------------
 #         LOOP DO JOGO - lê teclado, move personagem/câmera,
 #         redesenha o mapa (com scroll) e o personagem, troca de frame
 #---------------------------------------------------------------------------
 GAME_LOOP:
+	call TOCA_MUSICA
 	call MOVIMENTACAO
 	# desenha no frame OCULTO (o oposto do que está sendo exibido)
 	la t4, FRAME_ATIVO
