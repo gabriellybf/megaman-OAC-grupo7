@@ -749,7 +749,13 @@ GL_PULA:
 	la t4, VEL_Y
 	li t5, IMPULSO_PULO
 	sw t5, 0(t4)
- 
+    # Som pulo
+    li a0, 72              # Tom alto
+	li a1, 150             # Duração curta (150ms)
+	li a2, 113             # Instrumento: Tinkle Bell
+	li a3, 127             # Volume máximo
+	li a7, 31
+	ecall
 	# captura a direção atual como impulso horizontal do pulo
 	la t4, DIRECAO_ATUAL
 	lw t5, 0(t4)
@@ -794,7 +800,15 @@ GL_ATAQUE:
 	sw t6, 0(t4)                       # <-- DIREÇÃO DO PROJÉTIL: copia o FACING (lado que o personagem está olhando)
 	la t4, TIRO_DIST
 	sw zero, 0(t4)                     # <-- ZERA A DISTÂNCIA PERCORRIDA (começa a contar do zero pro alcance máximo)
-	j MV_GRAVIDADE
+	# som de tiro
+    li a0, 60              # Tom médio
+	li a1, 100             # Duração muito curta (100ms)
+	li a2, 118             # Instrumento: Synth Drum 
+	li a3, 127             # Volume
+	li a7, 31
+	ecall
+
+    j MV_GRAVIDADE
 
 GL_TROCA_ARMA:
 	la t4, ARMA_ATUAL
@@ -1252,6 +1266,14 @@ CHECA_COLISAO_POWERUP:
 	addi t1, t1, 1
 	sw t1, 0(t0)
 CP_REMOVE:
+    # Som para pegar power
+    li a0, 84              # Tom mais alto
+	li a1, 300             # Duração média-longa (300ms)
+	li a2, 9               # Instrumento: Glockenspiel (som de brilho/moeda)
+	li a3, 127             # Volume
+	li a7, 31
+	ecall
+
 	la t0, POWERUP_ATIVO
 	sw zero, 0(t0)                     # some da tela (não desenha mais, não colide mais)
 CP_FIM:
@@ -1764,6 +1786,13 @@ CCP_LOOP:
     beqz t1,CCP_FIM
     addi t1,t1,-1
     sw t1,0(t0)
+    # som de perca de vida
+    li a0, 45              # Tom grave
+    li a1, 300             # Duração média
+    li a2, 80              # Instrumento: Square Wave 
+    li a3, 127             # Volume máximo
+    li a7, 31
+    ecall
     
     call CHECA_GAME_OVER
 
@@ -2000,7 +2029,13 @@ CTP_LOOP:
     lw t4, 8(s3)
     addi t4, t4, -1
     sw t4, 8(s3)
-
+    # som de acerto
+    li a0, 80              # Tom agudo (blip)
+    li a1, 100             # Duração muito curta
+    li a2, 118             # Instrumento: Synth Drum 
+    li a3, 127             # Volume
+    li a7, 31
+    ecall
     # desativa o tiro
     la t0, TIRO_ATIVO
     sw zero, 0(t0)
@@ -2060,6 +2095,13 @@ CTA_LOOP:
     lw t4, 8(s3)
     addi t4, t4, -1
     sw t4, 8(s3)
+    # som de acertar tiro
+    li a0, 80              # Tom agudo (blip)
+    li a1, 100             # Duração muito curta
+    li a2, 118             # Instrumento: Synth Drum 
+    li a3, 127             # Volume
+    li a7, 31
+    ecall
 
     la t0, TIRO_ATIVO
     sw zero, 0(t0)
@@ -2261,6 +2303,13 @@ CCA_LOOP:
     beqz t1, CCA_FIM
     addi t1, t1, -1
     sw t1, 0(t0)
+    # som de tomar dano
+    li a0, 45              # Tom grave
+    li a1, 300             # Duração média
+    li a2, 80              # Instrumento: Square Wave
+    li a3, 127             # Volume máximo
+    li a7, 31
+    ecall
 
     call CHECA_GAME_OVER
 
