@@ -44,7 +44,7 @@ VIDAS:        .word 3        # vidas atuais do jogador
 VIDAS_MAX:    .word 4        # quantidade máxima de espaços exibidos no HUD
 POWERUP_X:      .word 400       # posição no MUNDO (mesmo sistema de coordenadas do PLAYER_X)
 POWERUP_Y:      .word 100       # posição vertical na tela (mesmo sistema do PLAYER_Y)
-POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
+POWERUP_ATIVO:  .word 0         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
 Y_TENTATIVA:        .word 0
 VELY_TMP:           .word 0
 PLAYER_X_CANDIDATO: .word 0
@@ -57,6 +57,8 @@ TILES_LARGURA_ATUAL: .word 141
 PLAYER_X_MAX_ATUAL:  .word 1644    
 CAM_MAX_ATUAL:        .word 1372    
 PLAYER_Y_CHAO_ATUAL:  .word 145      # ajustar pra fase 2
+PROJETIS_ATUAL: .word 8        # munição atual de tiros
+POWERUP_TIPO:   .word 0        # 0 = cura, 1 = munição (usa o mesmo slot POWERUP_X/Y/ATIVO)
 # ---- animação do personagem ----
 FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o personagem está olhando; NÃO zera quando solta a tecla)
 ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
@@ -116,6 +118,25 @@ ANDADORES:
 
 ANDADOR_FRAME:  .word 0
 ANDADOR_TIMER:  .word 0
+# ---- POWER-UPS FIXOS DA FASE 2 (sem mystery box) ----
+.eqv TAM_POWERUP2, 16      # 4 words: x, y, ativo, tipo
+NUM_POWERUPS2: .word 3
+POWERUPS2:
+# powerup 1 - cura
+.word 300      # x mundo (AJUSTE conforme seu mapa)
+.word 95       # y tela
+.word 1        # ativo
+.word 0        # tipo: 0 = cura
+# powerup 2 - cura
+.word 900
+.word 90
+.word 1
+.word 0        # cura
+# powerup 3 - munição
+.word 1400
+.word 95
+.word 1
+.word 1        # tipo: 1 = munição
 
 # ---- chefes por fase ----
 # fase 1: Bowser de fogo; fase 2: Rosalina e Mario
@@ -215,15 +236,16 @@ IMPACTO_MARIO_X:          .word 0
 .eqv PLAYER_Y_CHAO, 145       # posição vertical do personagem no chão
 .eqv IMPULSO_PULO, -13        # velocidade inicial pra cima (negativo = sobe)
 .eqv GRAVIDADE, 1             # aceleração pra baixo a cada frame
+.eqv VELY_MAX, 12             # velocidade máxima de queda
 .eqv TILE_SIZE, 12
 .eqv TILES_LARGURA, 141        # MAP_LARGURA (1692) / TILE_SIZE
 .eqv TILES_ALTURA, 20           # 240 / TILE_SIZE
+.eqv PROJETIS_MAX, 8           # munição máxima (usado pra recarregar)
 # Valores possíveis dentro da matriz:
 #   0 = nada (vazio, personagem passa livre)
 #   1 = bloco sólido (chão, plataforma, cano, parede)
 #   2 = mystery box - sai o power-up de CURA
-#   3 = mystery box reservada para o segundo power-up
-#   3 = mystery box reservada para o segundo power-up
+#   3 = mystery box - sai o municao
 #   4 = porta pra próxima fase
 #   5 = mystery box JÁ USADA (vira sólida e "vazia")
 MAPA_COLISAO:
@@ -234,11 +256,11 @@ MAPA_COLISAO:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
@@ -370,6 +392,10 @@ MAPA_COLISAO2:
 .include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/youwin.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/municao.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/energia.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/soco.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/canhao.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/rosalina_projetil.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/bowser_fogo2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/mario_fogo.data"
@@ -867,6 +893,7 @@ GAME_LOOP:
 	call DESENHA_TIRO
 	call DESENHA_POWERUP
 	call DESENHA_HUD 
+	call DESENHA_ARMA_HUD
 	
 	call ATUALIZA_PLANTA
 	call DESENHA_PLANTAS
@@ -1030,7 +1057,15 @@ GL_ATAQUE:
 	la t4, TIRO_ATIVO
 	lw t6, 0(t4)
 	bnez t6, MV_GRAVIDADE             # já tem projétil voando -> não dispara outro
+
+	la t4, PROJETIS_ATUAL
+	lw t6, 0(t4)
+	beqz t6, MV_GRAVIDADE             # sem munição -> não dispara
+	addi t6, t6, -1
+	sw t6, 0(t4)                      # gasta 1 projétil
+
 	li t6, 1
+	la t4, TIRO_ATIVO
 	sw t6, 0(t4)
 	la t4, PLAYER_X
 	lw t6, 0(t4)
@@ -1138,6 +1173,10 @@ MV_SEM_COLISAO_BAIXO:
 	la t0, VELY_TMP
 	lw t5, 0(t0)
 	addi t5, t5, GRAVIDADE
+	li t6, VELY_MAX
+	ble t5, t6, MV_SEM_BAIXO_OK
+	mv t5, t6
+MV_SEM_BAIXO_OK:
 	la t4, VEL_Y
 	sw t5, 0(t4)
 	j MV_CHAO_FIXO
@@ -1166,8 +1205,13 @@ MV_SEM_COLISAO_CIMA:
 	la t0, VELY_TMP
 	lw t5, 0(t0)
 	addi t5, t5, GRAVIDADE
+	li t6, VELY_MAX
+	ble t5, t6, MV_SEM_CIMA_OK
+	mv t5, t6
+MV_SEM_CIMA_OK:
 	la t4, VEL_Y
 	sw t5, 0(t4)
+
  
 MV_CHAO_FIXO:
     la t5, PLAYER_Y_CHAO_ATUAL      # ANTES: li t5, PLAYER_Y_CHAO
@@ -1431,25 +1475,42 @@ ES_PULO1:
 #---------------------------------------------------------------------------
 DESENHA_HUD:
 	addi sp, sp, -4
-	sw ra, 0(sp)          # salva o endereço de retorno ANTES de chamar outra função
+	sw ra, 0(sp)
  
 	la t0, VIDAS
-	lw s2, 0(t0)          # vidas restantes
-	li s3, 0              # contador de ícones desenhados
-	li s4, 4              # x inicial (margem esquerda da tela)
+	lw s2, 0(t0)
+	li s3, 0
+	li s4, 4
 DH_LOOP:
-	beq s3, s2, DH_FIM
+	beq s3, s2, DH_MUNICAO
 	la a0, coracao
 	mv a1, s4
-	li a2, 4              # y (margem do topo)
-	mv a3, s1             # frame oculto atual (vem do GAME_LOOP)
-	li a4, 199            # cor de fundo transparente do ícone
+	li a2, 4
+	mv a3, s1
+	li a4, 199
 	call PRINT_PERSONAGEM
 	addi s4, s4, 34
 	addi s3, s3, 1
 	j DH_LOOP
+
+DH_MUNICAO:
+	la t0, PROJETIS_ATUAL
+	lw s2, 0(t0)          # quantos tiros restam
+	li s3, 0
+	li s4, 4              # mesma margem esquerda dos corações
+DH_MUNICAO_LOOP:
+	beq s3, s2, DH_FIM
+	la a0, municao
+	mv a1, s4
+	li a2, 30             # y abaixo da fileira de corações (ajuste se sobrepor)
+	mv a3, s1
+	li a4, 199
+	call PRINT_PERSONAGEM
+	addi s4, s4, 16
+	addi s3, s3, 1
+	j DH_MUNICAO_LOOP
 DH_FIM:
-	lw ra, 0(sp)           # restaura o endereço de retorno certo
+	lw ra, 0(sp)
 	addi sp, sp, 4
 	ret
 #---------------------------------------------------------------------------
@@ -1458,12 +1519,24 @@ DH_FIM:
 DESENHA_POWERUP:
 	addi sp, sp, -4
 	sw ra, 0(sp)
- 
+
+	la t0, FASE_ATUAL
+	lw t1, 0(t0)
+	li t2, 2
+	beq t1, t2, DP_VETOR
+
 	la t0, POWERUP_ATIVO
 	lw t1, 0(t0)
 	beqz t1, DP_FIM
  
+	la t0, POWERUP_TIPO
+	lw t1, 0(t0)
+	bnez t1, DP_MUNICAO
 	la a0, cura
+	j DP_POS
+DP_MUNICAO:
+	la a0, energia
+DP_POS:
 	la t0, POWERUP_X
 	lw t1, 0(t0)
 	la t0, CAMERA_X
@@ -1482,10 +1555,80 @@ DP_FIM:
 	lw ra, 0(sp)
 	addi sp, sp, 4
 	ret
+
+DP_VETOR:
+    la t0, NUM_POWERUPS2
+    lw s2, 0(t0)
+    la s3, POWERUPS2
+    li t3, 0
+
+DP2_LOOP:
+    beq t3, s2, DP_FIM               # sai pelo mesmo ponto (restaura ra/sp certinho)
+
+    lw t4, 8(s3)
+    beqz t4, DP2_PROXIMA
+
+    lw t5, 0(s3)
+    la t6, CAMERA_X
+    lw t6, 0(t6)
+    sub a1, t5, t6
+    bltz a1, DP2_PROXIMA
+    li t5, TELA_LARGURA
+    bge a1, t5, DP2_PROXIMA
+
+    lw a2, 4(s3)
+    lw t5, 12(s3)
+    bnez t5, DP2_MUNICAO
+    la a0, cura
+    j DP2_DESENHA
+DP2_MUNICAO:
+    la a0, energia
+DP2_DESENHA:
+    mv a3, s1
+    li a4, 199
+    call PRINT_PERSONAGEM
+DP2_PROXIMA:
+    addi s3, s3, TAM_POWERUP2
+    addi t3, t3, 1
+    j DP2_LOOP
+#---------------------------------------------------------------------------
+#      DESENHA_ARMA_HUD - mostra no canto sup. direito qual arma está ativa
+#---------------------------------------------------------------------------
+DESENHA_ARMA_HUD:
+    addi sp, sp, -4
+    sw ra, 0(sp)
+
+    la t0, ARMA_ATUAL
+    lw t1, 0(t0)
+    bnez t1, DAH_SOCO
+
+    la a0, canhao            # ícone da arma de TIRO (arma=0)
+    j DAH_POS
+DAH_SOCO:
+    la a0, soco         # ícone da arma de SOCO (arma=1)
+
+DAH_POS:
+    lw t4, 0(a0)            # largura do ícone (lida do header da imagem)
+    li t5, TELA_LARGURA
+    sub t5, t5, t4
+    addi a1, t5, -4         # x = borda direita - largura - margem de 4px
+    li a2, 4                # y = mesma margem de topo dos corações
+    mv a3, s1
+    li a4, 199
+    call PRINT_PERSONAGEM
+
+    lw ra, 0(sp)
+    addi sp, sp, 4
+    ret
 #---------------------------------------------------------------------------
 #      CHECA_COLISAO_POWERUP - personagem encostou no power-up de cura?
 #---------------------------------------------------------------------------
 CHECA_COLISAO_POWERUP:
+	la t0, FASE_ATUAL
+	lw t1, 0(t0)
+	li t2, 2
+	beq t1, t2, CCP_VETOR       # fase 2 -> usa a lista de power-ups fixos
+
 	la t0, POWERUP_ATIVO
 	lw t1, 0(t0)
 	beqz t1, CP_FIM                 # já foi coletado, não checa mais
@@ -1496,38 +1639,49 @@ CHECA_COLISAO_POWERUP:
 	
 	# --- eixo X ---
 	la t0, PLAYER_X
-	lw t3, 0(t0)                    # player x
+	lw t3, 0(t0)
 	la t0, POWERUP_X
-	lw t4, 0(t0)                    # powerup x
+	lw t4, 0(t0)
  
-	add t5, t4, t6                  # powerup_x + largura
-	bge t3, t5, CP_FIM                # player totalmente à direita -> sem colisão
+	add t5, t4, t6
+	bge t3, t5, CP_FIM
  
 	li t5, LARG_PERSONAGEM
-	add t5, t3, t5                    # player_x + largura do personagem
-	ble t5, t4, CP_FIM                  # player totalmente à esquerda -> sem colisão
+	add t5, t3, t5
+	ble t5, t4, CP_FIM
  
 	# --- eixo Y ---
 	la t0, PLAYER_Y
-	lw t3, 0(t0)                        # player y
+	lw t3, 0(t0)
 	la t0, POWERUP_Y
-	lw t4, 0(t0)                        # powerup y
+	lw t4, 0(t0)
  
-	add t5, t4, t2                      # powerup_y + altura
-	bge t3, t5, CP_FIM                    # player totalmente abaixo -> sem colisão
+	add t5, t4, t2
+	bge t3, t5, CP_FIM
  
-	li t5, LARG_PERSONAGEM                # personagem é quadrado (48x48), reaproveita como altura
+	li t5, LARG_PERSONAGEM
 	add t5, t3, t5
-	ble t5, t4, CP_FIM                      # player totalmente acima -> sem colisão
+	ble t5, t4, CP_FIM
  
-	# --- colidiu! cura se não estiver no máximo ---
+	# --- colidiu! ---
+	la t0, POWERUP_TIPO
+	lw t1, 0(t0)
+	bnez t1, CP_MUNICAO
+
 	la t0, VIDAS
 	lw t1, 0(t0)
 	la t4, VIDAS_MAX
 	lw t4, 0(t4)
-	bge t1, t4, CP_REMOVE            # vida já no máximo -> só remove o power-up mesmo assim
+	bge t1, t4, CP_REMOVE
 	addi t1, t1, 1
 	sw t1, 0(t0)
+	j CP_REMOVE
+
+CP_MUNICAO:
+	la t0, PROJETIS_ATUAL
+	li t1, PROJETIS_MAX
+	sw t1, 0(t0)
+
 CP_REMOVE:
     # Som para pegar power
     li a0, 84              # Tom mais alto
@@ -1538,9 +1692,70 @@ CP_REMOVE:
 	ecall
 
 	la t0, POWERUP_ATIVO
-	sw zero, 0(t0)                     # some da tela (não desenha mais, não colide mais)
+	sw zero, 0(t0)
 CP_FIM:
 	ret
+
+CCP_VETOR:
+    la t0, NUM_POWERUPS2
+    lw s2, 0(t0)
+    la s3, POWERUPS2
+    li t3, 0
+
+CCP2_LOOP:
+    beq t3, s2, CP_FIM              # reaproveita o mesmo ponto de saída
+
+    lw t4, 8(s3)                    # ativo?
+    beqz t4, CCP2_PROXIMA
+
+    lw a0, 12(s3)                   # tipo
+    bnez a0, CCP2_TAM_MUNICAO
+    la a1, cura
+    j CCP2_TAM_OK
+CCP2_TAM_MUNICAO:
+    la a1, energia
+CCP2_TAM_OK:
+    lw t6, 0(a1)
+    lw t2, 4(a1)
+
+    lw t5, 0(s3)
+    la t0, PLAYER_X
+    lw t1, 0(t0)
+    add t4, t5, t6
+    bge t1, t4, CCP2_PROXIMA
+    li t4, LARG_PERSONAGEM
+    add t4, t1, t4
+    ble t4, t5, CCP2_PROXIMA
+
+    lw t5, 4(s3)
+    la t0, PLAYER_Y
+    lw t1, 0(t0)
+    add t4, t5, t2
+    bge t1, t4, CCP2_PROXIMA
+    li t4, LARG_PERSONAGEM
+    add t4, t1, t4
+    ble t4, t5, CCP2_PROXIMA
+
+    lw a0, 12(s3)
+    bnez a0, CCP2_MUNICAO
+    la t0, VIDAS
+    lw t1, 0(t0)
+    la t4, VIDAS_MAX
+    lw t4, 0(t4)
+    bge t1, t4, CCP2_REMOVE
+    addi t1, t1, 1
+    sw t1, 0(t0)
+    j CCP2_REMOVE
+CCP2_MUNICAO:
+    la t0, PROJETIS_ATUAL
+    li t1, PROJETIS_MAX
+    sw t1, 0(t0)
+CCP2_REMOVE:
+    sw zero, 8(s3)
+CCP2_PROXIMA:
+    addi s3, s3, TAM_POWERUP2
+    addi t3, t3, 1
+    j CCP2_LOOP
 # ---------------------------------------------------------
 # Le o valor do tile numa posição do MUNDO
 # ---------------------------------------------------------
@@ -1741,6 +1956,8 @@ CBB_ABRE_POWERUP2:
     j CBB_SPAWN
  
 CBB_SPAWN:
+    la t0, POWERUP_TIPO
+    sw t2, 0(t0)                    # guarda o tipo ANTES da call
     # marca a mystery box como usada (vira bloco sólido "vazio", tipo Mario)
     la t0, PLAYER_X
     lw a0, 0(t0)
@@ -2141,13 +2358,22 @@ TELA_VITORIA:
     la t0, PROX_NOTA_TEMPO
     sw zero, 0(t0)
 
-    # espera 5 minutos (3000 x 100ms)
+    # espera (com opção de reiniciar)
     li s5, 3000
 TV_ESPERA:
     call TOCA_MUSICA
     li a0, 10
     li a7, 32
     ecall
+    # verifica tecla 's' para reiniciar
+    li t1, 0xFF200000
+    lw t6, 0(t1)
+    andi t6, t6, 0x0001
+    beq t6, zero, TV_SEM_TECLA
+    lw t2, 4(t1)
+    li t0, 'r'
+    beq t2, t0, REINICIA_JOGO
+TV_SEM_TECLA:
     addi s5, s5, -1
     bnez s5, TV_ESPERA
 
@@ -6530,6 +6756,14 @@ GAME_OVER_LOOP:
     li a0, 10               # Pausa de 10 milissegundos
     li a7, 32
     ecall
+    # verifica tecla 's' para reiniciar
+    li t1, 0xFF200000
+    lw t6, 0(t1)
+    andi t6, t6, 0x0001
+    beq t6, zero, GAME_OVER_LOOP
+    lw t2, 4(t1)
+    li t0, 'r'
+    beq t2, t0, REINICIA_JOGO
     j GAME_OVER_LOOP
 
 #-----------------------------------------------------------
@@ -6896,6 +7130,358 @@ CSA_PROXIMA:
 
 CSA_FIM:
     ret
-    
+
+#-----------------------------------------------------------
+# REINICIA_JOGO - reseta todas as variáveis e volta ao Setup
+#-----------------------------------------------------------
+REINICIA_JOGO:
+    # --- estado do jogador ---
+    li t0, 0
+    la t1, PLAYER_X
+    sw t0, 0(t1)
+    li t0, 145
+    la t1, PLAYER_Y
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, CAMERA_X
+    sw t0, 0(t1)
+    la t1, FRAME_ATIVO
+    sw t0, 0(t1)
+    la t1, PULANDO
+    sw t0, 0(t1)
+    la t1, VEL_Y
+    sw t0, 0(t1)
+    la t1, DIRECAO_ATUAL
+    sw t0, 0(t1)
+    la t1, VEL_X_PULO
+    sw t0, 0(t1)
+    la t1, BATEU_TETO
+    sw t0, 0(t1)
+    li t0, 3
+    la t1, VIDAS
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, INVENCIVEL_TIMER
+    sw t0, 0(t1)
+    la t1, TELA_FASE2_MOSTRADA
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, FASE_ATUAL
+    sw t0, 0(t1)
+    li t0, 8
+    la t1, PROJETIS_ATUAL
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, POWERUP_TIPO
+    sw t0, 0(t1)
+    la t1, POWERUP_ATIVO
+    sw t0, 0(t1)
+
+    # --- animação ---
+    li t0, 1
+    la t1, FACING
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, ANIM_TIMER
+    sw t0, 0(t1)
+    la t1, ANIM_FRAME
+    sw t0, 0(t1)
+
+    # --- ataques ---
+    la t1, ARMA_ATUAL
+    sw t0, 0(t1)
+    la t1, ATACANDO
+    sw t0, 0(t1)
+    la t1, ATAQUE_TIMER
+    sw t0, 0(t1)
+    la t1, TIRO_ATIVO
+    sw t0, 0(t1)
+    la t1, TIRO_DIST
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, TIRO_DIRECAO
+    sw t0, 0(t1)
+
+    # --- planta piranha ---
+    li t0, 3
+    la t1, NUM_PLANTAS
+    sw t0, 0(t1)
+    # planta 1
+    li t0, 526
+    la t1, PLANTAS
+    sw t0, 0(t1)
+    li t0, 128
+    sw t0, 4(t1)
+    li t0, 2
+    sw t0, 8(t1)
+    # planta 2
+    li t0, 886
+    sw t0, 12(t1)
+    li t0, 128
+    sw t0, 16(t1)
+    li t0, 2
+    sw t0, 20(t1)
+    # planta 3
+    li t0, 1347
+    sw t0, 24(t1)
+    li t0, 133
+    sw t0, 28(t1)
+    li t0, 2
+    sw t0, 32(t1)
+    li t0, 0
+    la t1, PLANTA_FRAME
+    sw t0, 0(t1)
+    la t1, PLANTA_TIMER
+    sw t0, 0(t1)
+
+    # --- andadores ---
+    li t0, 2
+    la t1, NUM_ANDADORES
+    sw t0, 0(t1)
+    # andador 1
+    li t0, 200
+    la t1, ANDADORES
+    sw t0, 0(t1)
+    li t0, 145
+    sw t0, 4(t1)
+    li t0, 2
+    sw t0, 8(t1)
+    li t0, 1
+    sw t0, 12(t1)
+    li t0, 200
+    sw t0, 16(t1)
+    # andador 2
+    li t0, 1080
+    sw t0, 20(t1)
+    li t0, 145
+    sw t0, 24(t1)
+    li t0, 2
+    sw t0, 28(t1)
+    li t0, -1
+    sw t0, 32(t1)
+    li t0, 1080
+    sw t0, 36(t1)
+    li t0, 0
+    la t1, ANDADOR_FRAME
+    sw t0, 0(t1)
+    la t1, ANDADOR_TIMER
+    sw t0, 0(t1)
+
+    # --- power-ups fase 2 ---
+    li t0, 3
+    la t1, NUM_POWERUPS2
+    sw t0, 0(t1)
+    li t0, 300
+    la t1, POWERUPS2
+    sw t0, 0(t1)
+    li t0, 95
+    sw t0, 4(t1)
+    li t0, 1
+    sw t0, 8(t1)
+    li t0, 0
+    sw t0, 12(t1)
+    li t0, 900
+    sw t0, 16(t1)
+    li t0, 90
+    sw t0, 20(t1)
+    li t0, 1
+    sw t0, 24(t1)
+    li t0, 0
+    sw t0, 28(t1)
+    li t0, 1400
+    sw t0, 32(t1)
+    li t0, 95
+    sw t0, 36(t1)
+    li t0, 1
+    sw t0, 40(t1)
+    li t0, 1
+    sw t0, 44(t1)
+
+    # --- Rosalina ---
+    li t0, 650
+    la t1, ROSALINA_X
+    sw t0, 0(t1)
+    la t1, ROSALINA_X_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 90
+    la t1, ROSALINA_Y
+    sw t0, 0(t1)
+    la t1, ROSALINA_Y_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, ROSALINA_ATIVA
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, ROSALINA_LIBERADA
+    sw t0, 0(t1)
+    li t0, 4
+    la t1, ROSALINA_VIDA
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, ROSALINA_ESTADO
+    sw t0, 0(t1)
+    la t1, ROSALINA_TIMER
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, ROSALINA_DIRECAO_Y
+    sw t0, 0(t1)
+    li t0, -1
+    la t1, ROSALINA_DIRECAO_X
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, ROSALINA_MOVIMENTO_TIMER
+    sw t0, 0(t1)
+    la t1, ROSALINA_ATAQUE_PROXIMO
+    sw t0, 0(t1)
+    la t1, ROSALINA_ALTERNANCIA
+    sw t0, 0(t1)
+    la t1, ROSALINA_ATAQUES
+    sw t0, 0(t1)
+    la t1, ROSALINA_CONTATO
+    sw t0, 0(t1)
+    la t1, ROSALINA_INVENCIVEL
+    sw t0, 0(t1)
+    la t1, ROSALINA_POSE_ATAQUE
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_ATIVA
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_TIPO
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_X
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_Y
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_VX
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_VY
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_ALVO_X
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_AVISO
+    sw t0, 0(t1)
+    la t1, ESTRELA_ROSALINA_SPRITE
+    sw t0, 0(t1)
+
+    # --- Bowser ---
+    li t0, 1540
+    la t1, BOWSER_X
+    sw t0, 0(t1)
+    la t1, BOWSER_X_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 113
+    la t1, BOWSER_Y
+    sw t0, 0(t1)
+    la t1, BOWSER_Y_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, BOWSER_ATIVO
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, BOWSER_LIBERADO
+    sw t0, 0(t1)
+    li t0, 3
+    la t1, BOWSER_VIDA
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, BOWSER_ESTADO
+    sw t0, 0(t1)
+    la t1, BOWSER_TIMER
+    sw t0, 0(t1)
+    li t0, -1
+    la t1, BOWSER_DIRECAO
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, BOWSER_VEL_Y
+    sw t0, 0(t1)
+    la t1, BOWSER_CONTATO
+    sw t0, 0(t1)
+    la t1, BOWSER_INVENCIVEL
+    sw t0, 0(t1)
+    la t1, BOWSER_POSE_ATAQUE
+    sw t0, 0(t1)
+    la t1, FOGO_BOWSER_ATIVO
+    sw t0, 0(t1)
+    la t1, FOGO_BOWSER_X
+    sw t0, 0(t1)
+    la t1, FOGO_BOWSER_Y
+    sw t0, 0(t1)
+    la t1, FOGO_BOWSER_VX
+    sw t0, 0(t1)
+    la t1, IMPACTO_BOWSER_ATIVO
+    sw t0, 0(t1)
+    la t1, IMPACTO_BOWSER_TIMER
+    sw t0, 0(t1)
+    la t1, IMPACTO_BOWSER_X
+    sw t0, 0(t1)
+
+    # --- Mario ---
+    li t0, 1540
+    la t1, MARIO_X
+    sw t0, 0(t1)
+    la t1, MARIO_X_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 100
+    la t1, MARIO_Y
+    sw t0, 0(t1)
+    la t1, MARIO_Y_ANTERIOR
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, MARIO_ATIVO
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, MARIO_LIBERADO
+    sw t0, 0(t1)
+    li t0, 6
+    la t1, MARIO_VIDA
+    sw t0, 0(t1)
+    li t0, 1
+    la t1, MARIO_FASE
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, MARIO_ESTADO
+    sw t0, 0(t1)
+    la t1, MARIO_TIMER
+    sw t0, 0(t1)
+    li t0, -1
+    la t1, MARIO_DIRECAO
+    sw t0, 0(t1)
+    li t0, 0
+    la t1, MARIO_VEL_Y
+    sw t0, 0(t1)
+    la t1, MARIO_ATAQUE_INDICE
+    sw t0, 0(t1)
+    la t1, MARIO_COMBINACAO
+    sw t0, 0(t1)
+    la t1, MARIO_CONTATO
+    sw t0, 0(t1)
+    la t1, MARIO_INVENCIVEL
+    sw t0, 0(t1)
+    la t1, MARIO_POSE_ATAQUE
+    sw t0, 0(t1)
+    la t1, MARIO_COPIA_ATIVA
+    sw t0, 0(t1)
+    la t1, MARIO_COPIA_X
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_ATIVO
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_TIPO
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_X
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_Y
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_VX
+    sw t0, 0(t1)
+    la t1, MARIO_PROJETIL_VY
+    sw t0, 0(t1)
+    la t1, IMPACTO_MARIO_ATIVO
+    sw t0, 0(t1)
+    la t1, IMPACTO_MARIO_TIMER
+    sw t0, 0(t1)
+    la t1, IMPACTO_MARIO_X
+    sw t0, 0(t1)
+
+    j Setup
+
 .data
 .include "SYSTEMv24.s"
