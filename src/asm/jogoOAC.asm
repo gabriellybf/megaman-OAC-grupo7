@@ -181,7 +181,7 @@ BOWSER_X:                 .word 1540
 BOWSER_Y:                 .word 113
 BOWSER_ATIVO:             .word 1
 BOWSER_LIBERADO:          .word 0        # ativa ao entrar na arena final da fase 1
-BOWSER_VIDA:              .word 3
+BOWSER_VIDA:              .word 6
 BOWSER_ESTADO:            .word 0
 BOWSER_TIMER:             .word 0
 BOWSER_DIRECAO:           .word -1
@@ -202,7 +202,7 @@ MARIO_X:                  .word 1540
 MARIO_Y:                  .word 100
 MARIO_ATIVO:              .word 1
 MARIO_LIBERADO:           .word 0
-MARIO_VIDA:               .word 6
+MARIO_VIDA:               .word 12
 MARIO_FASE:               .word 1
 MARIO_ESTADO:             .word 0
 MARIO_TIMER:              .word 0
@@ -2358,22 +2358,13 @@ TELA_VITORIA:
     la t0, PROX_NOTA_TEMPO
     sw zero, 0(t0)
 
-    # espera (com opção de reiniciar)
+    # espera 5 minutos (3000 x 100ms)
     li s5, 3000
 TV_ESPERA:
     call TOCA_MUSICA
     li a0, 10
     li a7, 32
     ecall
-    # verifica tecla 's' para reiniciar
-    li t1, 0xFF200000
-    lw t6, 0(t1)
-    andi t6, t6, 0x0001
-    beq t6, zero, TV_SEM_TECLA
-    lw t2, 4(t1)
-    li t0, 'r'
-    beq t2, t0, REINICIA_JOGO
-TV_SEM_TECLA:
     addi s5, s5, -1
     bnez s5, TV_ESPERA
 
@@ -6753,19 +6744,282 @@ GAME_OVER:
 
 GAME_OVER_LOOP:
     call TOCA_MUSICA
+
+    li t1, 0xFF200000       # controle do teclado (igual ao resto do jogo)
+    lw t6, 0(t1)
+    andi t6, t6, 0x0001
+    beqz t6, GO_SEM_TECLA    # nenhuma tecla -> continua esperando
+
+    lw t2, 4(t1)             # valor da tecla lida
+    li t3, 'r'
+    beq t2, t3, RESTART_JOGO
+    li t3, 'R'
+    beq t2, t3, RESTART_JOGO
+
+GO_SEM_TECLA:
     li a0, 10               # Pausa de 10 milissegundos
     li a7, 32
     ecall
-    # verifica tecla 's' para reiniciar
-    li t1, 0xFF200000
-    lw t6, 0(t1)
-    andi t6, t6, 0x0001
-    beq t6, zero, GAME_OVER_LOOP
-    lw t2, 4(t1)
-    li t0, 'r'
-    beq t2, t0, REINICIA_JOGO
     j GAME_OVER_LOOP
+#-----------------------------------------------------------
+# RESTART_JOGO - tecla R no Game Over: volta pra fase 1
+#-----------------------------------------------------------
+RESTART_JOGO:
+    # --- status do jogador ---
+    la t0, VIDAS
+    li t1, 3
+    sw t1, 0(t0)
+    la t0, PROJETIS_ATUAL
+    li t1, PROJETIS_MAX
+    sw t1, 0(t0)
+    la t0, PLAYER_X
+    sw zero, 0(t0)
+    la t0, PLAYER_Y
+    li t1, 145
+    sw t1, 0(t0)
+    la t0, CAMERA_X
+    sw zero, 0(t0)
+    la t0, PULANDO
+    sw zero, 0(t0)
+    la t0, VEL_Y
+    sw zero, 0(t0)
+    la t0, DIRECAO_ATUAL
+    sw zero, 0(t0)
+    la t0, VEL_X_PULO
+    sw zero, 0(t0)
+    la t0, BATEU_TETO
+    sw zero, 0(t0)
+    la t0, FACING
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, ANIM_TIMER
+    sw zero, 0(t0)
+    la t0, ANIM_FRAME
+    sw zero, 0(t0)
+    la t0, ARMA_ATUAL
+    sw zero, 0(t0)
+    la t0, ATACANDO
+    sw zero, 0(t0)
+    la t0, ATAQUE_TIMER
+    sw zero, 0(t0)
+    la t0, TIRO_ATIVO
+    sw zero, 0(t0)
+    la t0, TIRO_X
+    sw zero, 0(t0)
+    la t0, TIRO_Y
+    sw zero, 0(t0)
+    la t0, TIRO_DIRECAO
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, TIRO_DIST
+    sw zero, 0(t0)
+    la t0, POWERUP_X
+    li t1, 400
+    sw t1, 0(t0)
+    la t0, POWERUP_Y
+    li t1, 100
+    sw t1, 0(t0)
+    la t0, POWERUP_ATIVO
+    sw zero, 0(t0)
+    la t0, INVENCIVEL_TIMER
+    sw zero, 0(t0)
+    la t0, TELA_FASE2_MOSTRADA
+    sw zero, 0(t0)
+    la t0, FASE_ATUAL
+    li t1, 1
+    sw t1, 0(t0)
 
+    # --- plantas (fase 1) ---
+    la t0, PLANTAS
+    li t1, 526
+    sw t1, 0(t0)
+    li t1, 128
+    sw t1, 4(t0)
+    li t1, 2
+    sw t1, 8(t0)
+    li t1, 886
+    sw t1, 12(t0)
+    li t1, 128
+    sw t1, 16(t0)
+    li t1, 2
+    sw t1, 20(t0)
+    li t1, 1347
+    sw t1, 24(t0)
+    li t1, 133
+    sw t1, 28(t0)
+    li t1, 2
+    sw t1, 32(t0)
+    la t0, PLANTA_FRAME
+    sw zero, 0(t0)
+    la t0, PLANTA_TIMER
+    sw zero, 0(t0)
+
+    # --- andadores ---
+    la t0, ANDADORES
+    li t1, 200
+    sw t1, 0(t0)
+    li t1, 145
+    sw t1, 4(t0)
+    li t1, 2
+    sw t1, 8(t0)
+    li t1, 1
+    sw t1, 12(t0)
+    li t1, 200
+    sw t1, 16(t0)
+    li t1, 1080
+    sw t1, 20(t0)
+    li t1, 145
+    sw t1, 24(t0)
+    li t1, 2
+    sw t1, 28(t0)
+    li t1, -1
+    sw t1, 32(t0)
+    li t1, 1080
+    sw t1, 36(t0)
+    la t0, ANDADOR_FRAME
+    sw zero, 0(t0)
+    la t0, ANDADOR_TIMER
+    sw zero, 0(t0)
+
+    # --- bowser (chefão fase 1) ---
+    la t0, BOWSER_X
+    li t1, 1540
+    sw t1, 0(t0)
+    la t0, BOWSER_Y
+    li t1, 113
+    sw t1, 0(t0)
+    la t0, BOWSER_ATIVO
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, BOWSER_LIBERADO
+    sw zero, 0(t0)
+    la t0, BOWSER_VIDA
+    li t1, 6
+    sw t1, 0(t0)
+    la t0, BOWSER_ESTADO
+    sw zero, 0(t0)
+    la t0, BOWSER_TIMER
+    sw zero, 0(t0)
+    la t0, BOWSER_DIRECAO
+    li t1, -1
+    sw t1, 0(t0)
+    la t0, BOWSER_VEL_Y
+    sw zero, 0(t0)
+    la t0, BOWSER_CONTATO
+    sw zero, 0(t0)
+    la t0, BOWSER_INVENCIVEL
+    sw zero, 0(t0)
+    la t0, BOWSER_POSE_ATAQUE
+    sw zero, 0(t0)
+    la t0, FOGO_BOWSER_ATIVO
+    sw zero, 0(t0)
+    la t0, IMPACTO_BOWSER_ATIVO
+    sw zero, 0(t0)
+    la t0, IMPACTO_BOWSER_TIMER
+    sw zero, 0(t0)
+    la t0, BOWSER_X_ANTERIOR
+    li t1, 1540
+    sw t1, 0(t0)
+    la t0, BOWSER_Y_ANTERIOR
+    li t1, 113
+    sw t1, 0(t0)
+
+    # --- rosalina e mario (fase 2), pra caso você chegue lá de novo ---
+    la t0, ROSALINA_X
+    li t1, 650
+    sw t1, 0(t0)
+    la t0, ROSALINA_Y
+    li t1, 90
+    sw t1, 0(t0)
+    la t0, ROSALINA_ATIVA
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, ROSALINA_LIBERADA
+    sw zero, 0(t0)
+    la t0, ROSALINA_VIDA
+    li t1, 4
+    sw t1, 0(t0)
+    la t0, ROSALINA_ESTADO
+    sw zero, 0(t0)
+    la t0, ROSALINA_TIMER
+    sw zero, 0(t0)
+    la t0, ROSALINA_CONTATO
+    sw zero, 0(t0)
+    la t0, ROSALINA_INVENCIVEL
+    sw zero, 0(t0)
+    la t0, ESTRELA_ROSALINA_ATIVA
+    sw zero, 0(t0)
+    la t0, ESTRELA_ROSALINA_AVISO
+    sw zero, 0(t0)
+    la t0, ROSALINA_X_ANTERIOR
+    li t1, 650
+    sw t1, 0(t0)
+    la t0, ROSALINA_Y_ANTERIOR
+    li t1, 90
+    sw t1, 0(t0)
+
+    la t0, MARIO_X
+    li t1, 1540
+    sw t1, 0(t0)
+    la t0, MARIO_Y
+    li t1, 100
+    sw t1, 0(t0)
+    la t0, MARIO_ATIVO
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, MARIO_LIBERADO
+    sw zero, 0(t0)
+    la t0, MARIO_VIDA
+    li t1, 12
+    sw t1, 0(t0)
+    la t0, MARIO_FASE
+    li t1, 1
+    sw t1, 0(t0)
+    la t0, MARIO_ESTADO
+    sw zero, 0(t0)
+    la t0, MARIO_TIMER
+    sw zero, 0(t0)
+    la t0, MARIO_ATAQUE_INDICE
+    sw zero, 0(t0)
+    la t0, MARIO_COMBINACAO
+    sw zero, 0(t0)
+    la t0, MARIO_CONTATO
+    sw zero, 0(t0)
+    la t0, MARIO_INVENCIVEL
+    sw zero, 0(t0)
+    la t0, MARIO_COPIA_ATIVA
+    sw zero, 0(t0)
+    la t0, MARIO_PROJETIL_ATIVO
+    sw zero, 0(t0)
+    la t0, MARIO_X_ANTERIOR
+    li t1, 1540
+    sw t1, 0(t0)
+    la t0, MARIO_Y_ANTERIOR
+    li t1, 100
+    sw t1, 0(t0)
+
+    # --- power-ups fixos da fase 2 ---
+    la t0, POWERUPS2
+    li t1, 300
+    sw t1, 0(t0)
+    li t1, 95
+    sw t1, 4(t0)
+    li t1, 1
+    sw t1, 8(t0)
+    li t1, 900
+    sw t1, 16(t0)
+    li t1, 90
+    sw t1, 20(t0)
+    li t1, 1
+    sw t1, 24(t0)
+    li t1, 1400
+    sw t1, 32(t0)
+    li t1, 95
+    sw t1, 36(t0)
+    li t1, 1
+    sw t1, 40(t0)
+
+    j Setup
 #-----------------------------------------------------------
 # COLISAO TIRO COM ANDADORES
 #-----------------------------------------------------------
@@ -7130,358 +7384,6 @@ CSA_PROXIMA:
 
 CSA_FIM:
     ret
-
-#-----------------------------------------------------------
-# REINICIA_JOGO - reseta todas as variáveis e volta ao Setup
-#-----------------------------------------------------------
-REINICIA_JOGO:
-    # --- estado do jogador ---
-    li t0, 0
-    la t1, PLAYER_X
-    sw t0, 0(t1)
-    li t0, 145
-    la t1, PLAYER_Y
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, CAMERA_X
-    sw t0, 0(t1)
-    la t1, FRAME_ATIVO
-    sw t0, 0(t1)
-    la t1, PULANDO
-    sw t0, 0(t1)
-    la t1, VEL_Y
-    sw t0, 0(t1)
-    la t1, DIRECAO_ATUAL
-    sw t0, 0(t1)
-    la t1, VEL_X_PULO
-    sw t0, 0(t1)
-    la t1, BATEU_TETO
-    sw t0, 0(t1)
-    li t0, 3
-    la t1, VIDAS
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, INVENCIVEL_TIMER
-    sw t0, 0(t1)
-    la t1, TELA_FASE2_MOSTRADA
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, FASE_ATUAL
-    sw t0, 0(t1)
-    li t0, 8
-    la t1, PROJETIS_ATUAL
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, POWERUP_TIPO
-    sw t0, 0(t1)
-    la t1, POWERUP_ATIVO
-    sw t0, 0(t1)
-
-    # --- animação ---
-    li t0, 1
-    la t1, FACING
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, ANIM_TIMER
-    sw t0, 0(t1)
-    la t1, ANIM_FRAME
-    sw t0, 0(t1)
-
-    # --- ataques ---
-    la t1, ARMA_ATUAL
-    sw t0, 0(t1)
-    la t1, ATACANDO
-    sw t0, 0(t1)
-    la t1, ATAQUE_TIMER
-    sw t0, 0(t1)
-    la t1, TIRO_ATIVO
-    sw t0, 0(t1)
-    la t1, TIRO_DIST
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, TIRO_DIRECAO
-    sw t0, 0(t1)
-
-    # --- planta piranha ---
-    li t0, 3
-    la t1, NUM_PLANTAS
-    sw t0, 0(t1)
-    # planta 1
-    li t0, 526
-    la t1, PLANTAS
-    sw t0, 0(t1)
-    li t0, 128
-    sw t0, 4(t1)
-    li t0, 2
-    sw t0, 8(t1)
-    # planta 2
-    li t0, 886
-    sw t0, 12(t1)
-    li t0, 128
-    sw t0, 16(t1)
-    li t0, 2
-    sw t0, 20(t1)
-    # planta 3
-    li t0, 1347
-    sw t0, 24(t1)
-    li t0, 133
-    sw t0, 28(t1)
-    li t0, 2
-    sw t0, 32(t1)
-    li t0, 0
-    la t1, PLANTA_FRAME
-    sw t0, 0(t1)
-    la t1, PLANTA_TIMER
-    sw t0, 0(t1)
-
-    # --- andadores ---
-    li t0, 2
-    la t1, NUM_ANDADORES
-    sw t0, 0(t1)
-    # andador 1
-    li t0, 200
-    la t1, ANDADORES
-    sw t0, 0(t1)
-    li t0, 145
-    sw t0, 4(t1)
-    li t0, 2
-    sw t0, 8(t1)
-    li t0, 1
-    sw t0, 12(t1)
-    li t0, 200
-    sw t0, 16(t1)
-    # andador 2
-    li t0, 1080
-    sw t0, 20(t1)
-    li t0, 145
-    sw t0, 24(t1)
-    li t0, 2
-    sw t0, 28(t1)
-    li t0, -1
-    sw t0, 32(t1)
-    li t0, 1080
-    sw t0, 36(t1)
-    li t0, 0
-    la t1, ANDADOR_FRAME
-    sw t0, 0(t1)
-    la t1, ANDADOR_TIMER
-    sw t0, 0(t1)
-
-    # --- power-ups fase 2 ---
-    li t0, 3
-    la t1, NUM_POWERUPS2
-    sw t0, 0(t1)
-    li t0, 300
-    la t1, POWERUPS2
-    sw t0, 0(t1)
-    li t0, 95
-    sw t0, 4(t1)
-    li t0, 1
-    sw t0, 8(t1)
-    li t0, 0
-    sw t0, 12(t1)
-    li t0, 900
-    sw t0, 16(t1)
-    li t0, 90
-    sw t0, 20(t1)
-    li t0, 1
-    sw t0, 24(t1)
-    li t0, 0
-    sw t0, 28(t1)
-    li t0, 1400
-    sw t0, 32(t1)
-    li t0, 95
-    sw t0, 36(t1)
-    li t0, 1
-    sw t0, 40(t1)
-    li t0, 1
-    sw t0, 44(t1)
-
-    # --- Rosalina ---
-    li t0, 650
-    la t1, ROSALINA_X
-    sw t0, 0(t1)
-    la t1, ROSALINA_X_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 90
-    la t1, ROSALINA_Y
-    sw t0, 0(t1)
-    la t1, ROSALINA_Y_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, ROSALINA_ATIVA
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, ROSALINA_LIBERADA
-    sw t0, 0(t1)
-    li t0, 4
-    la t1, ROSALINA_VIDA
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, ROSALINA_ESTADO
-    sw t0, 0(t1)
-    la t1, ROSALINA_TIMER
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, ROSALINA_DIRECAO_Y
-    sw t0, 0(t1)
-    li t0, -1
-    la t1, ROSALINA_DIRECAO_X
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, ROSALINA_MOVIMENTO_TIMER
-    sw t0, 0(t1)
-    la t1, ROSALINA_ATAQUE_PROXIMO
-    sw t0, 0(t1)
-    la t1, ROSALINA_ALTERNANCIA
-    sw t0, 0(t1)
-    la t1, ROSALINA_ATAQUES
-    sw t0, 0(t1)
-    la t1, ROSALINA_CONTATO
-    sw t0, 0(t1)
-    la t1, ROSALINA_INVENCIVEL
-    sw t0, 0(t1)
-    la t1, ROSALINA_POSE_ATAQUE
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_ATIVA
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_TIPO
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_X
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_Y
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_VX
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_VY
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_ALVO_X
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_AVISO
-    sw t0, 0(t1)
-    la t1, ESTRELA_ROSALINA_SPRITE
-    sw t0, 0(t1)
-
-    # --- Bowser ---
-    li t0, 1540
-    la t1, BOWSER_X
-    sw t0, 0(t1)
-    la t1, BOWSER_X_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 113
-    la t1, BOWSER_Y
-    sw t0, 0(t1)
-    la t1, BOWSER_Y_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, BOWSER_ATIVO
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, BOWSER_LIBERADO
-    sw t0, 0(t1)
-    li t0, 3
-    la t1, BOWSER_VIDA
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, BOWSER_ESTADO
-    sw t0, 0(t1)
-    la t1, BOWSER_TIMER
-    sw t0, 0(t1)
-    li t0, -1
-    la t1, BOWSER_DIRECAO
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, BOWSER_VEL_Y
-    sw t0, 0(t1)
-    la t1, BOWSER_CONTATO
-    sw t0, 0(t1)
-    la t1, BOWSER_INVENCIVEL
-    sw t0, 0(t1)
-    la t1, BOWSER_POSE_ATAQUE
-    sw t0, 0(t1)
-    la t1, FOGO_BOWSER_ATIVO
-    sw t0, 0(t1)
-    la t1, FOGO_BOWSER_X
-    sw t0, 0(t1)
-    la t1, FOGO_BOWSER_Y
-    sw t0, 0(t1)
-    la t1, FOGO_BOWSER_VX
-    sw t0, 0(t1)
-    la t1, IMPACTO_BOWSER_ATIVO
-    sw t0, 0(t1)
-    la t1, IMPACTO_BOWSER_TIMER
-    sw t0, 0(t1)
-    la t1, IMPACTO_BOWSER_X
-    sw t0, 0(t1)
-
-    # --- Mario ---
-    li t0, 1540
-    la t1, MARIO_X
-    sw t0, 0(t1)
-    la t1, MARIO_X_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 100
-    la t1, MARIO_Y
-    sw t0, 0(t1)
-    la t1, MARIO_Y_ANTERIOR
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, MARIO_ATIVO
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, MARIO_LIBERADO
-    sw t0, 0(t1)
-    li t0, 6
-    la t1, MARIO_VIDA
-    sw t0, 0(t1)
-    li t0, 1
-    la t1, MARIO_FASE
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, MARIO_ESTADO
-    sw t0, 0(t1)
-    la t1, MARIO_TIMER
-    sw t0, 0(t1)
-    li t0, -1
-    la t1, MARIO_DIRECAO
-    sw t0, 0(t1)
-    li t0, 0
-    la t1, MARIO_VEL_Y
-    sw t0, 0(t1)
-    la t1, MARIO_ATAQUE_INDICE
-    sw t0, 0(t1)
-    la t1, MARIO_COMBINACAO
-    sw t0, 0(t1)
-    la t1, MARIO_CONTATO
-    sw t0, 0(t1)
-    la t1, MARIO_INVENCIVEL
-    sw t0, 0(t1)
-    la t1, MARIO_POSE_ATAQUE
-    sw t0, 0(t1)
-    la t1, MARIO_COPIA_ATIVA
-    sw t0, 0(t1)
-    la t1, MARIO_COPIA_X
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_ATIVO
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_TIPO
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_X
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_Y
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_VX
-    sw t0, 0(t1)
-    la t1, MARIO_PROJETIL_VY
-    sw t0, 0(t1)
-    la t1, IMPACTO_MARIO_ATIVO
-    sw t0, 0(t1)
-    la t1, IMPACTO_MARIO_TIMER
-    sw t0, 0(t1)
-    la t1, IMPACTO_MARIO_X
-    sw t0, 0(t1)
-
-    j Setup
-
+    
 .data
 .include "SYSTEMv24.s"
