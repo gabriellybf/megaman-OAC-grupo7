@@ -160,7 +160,7 @@ BOWSER_X:                 .word 1540
 BOWSER_Y:                 .word 113
 BOWSER_ATIVO:             .word 1
 BOWSER_LIBERADO:          .word 0        # ativa ao entrar na arena final da fase 1
-BOWSER_VIDA:              .word 6
+BOWSER_VIDA:              .word 3
 BOWSER_ESTADO:            .word 0
 BOWSER_TIMER:             .word 0
 BOWSER_DIRECAO:           .word -1
@@ -181,7 +181,7 @@ MARIO_X:                  .word 1540
 MARIO_Y:                  .word 100
 MARIO_ATIVO:              .word 1
 MARIO_LIBERADO:           .word 0
-MARIO_VIDA:               .word 12
+MARIO_VIDA:               .word 6
 MARIO_FASE:               .word 1
 MARIO_ESTADO:             .word 0
 MARIO_TIMER:              .word 0
