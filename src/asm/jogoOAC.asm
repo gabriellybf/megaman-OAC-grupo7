@@ -39,7 +39,7 @@ VIDAS:        .word 3        # vidas atuais do jogador
 VIDAS_MAX:    .word 4        # vidas máximas (usado pra desenhar os "espaços vazios" se quiser)
 POWERUP_X:      .word 400       # posição no MUNDO (mesmo sistema de coordenadas do PLAYER_X)
 POWERUP_Y:      .word 100       # posição vertical na tela (mesmo sistema do PLAYER_Y)
-POWERUP_ATIVO:  .word 1         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
+POWERUP_ATIVO:  .word 0         # 1 = ainda disponível na fase, 0 = já foi coletado (some)
 Y_TENTATIVA:        .word 0
 VELY_TMP:           .word 0
 PLAYER_X_CANDIDATO: .word 0
@@ -52,6 +52,8 @@ TILES_LARGURA_ATUAL: .word 141
 PLAYER_X_MAX_ATUAL:  .word 1644    
 CAM_MAX_ATUAL:        .word 1372    
 PLAYER_Y_CHAO_ATUAL:  .word 145      # ajustar pra fase 2
+PROJETIS_ATUAL: .word 8        # munição atual de tiros
+POWERUP_TIPO:   .word 0        # 0 = cura, 1 = munição (usa o mesmo slot POWERUP_X/Y/ATIVO)
 # ---- animação do personagem ----
 FACING:       .word 1        # 1 = direita, -1 = esquerda (direção que o personagem está olhando; NÃO zera quando solta a tecla)
 ANIM_TIMER:   .word 0        # contador de ciclos do GAME_LOOP até trocar de frame
@@ -109,6 +111,25 @@ ANDADORES:
 
 ANDADOR_FRAME:  .word 0
 ANDADOR_TIMER:  .word 0
+# ---- POWER-UPS FIXOS DA FASE 2 (sem mystery box) ----
+.eqv TAM_POWERUP2, 16      # 4 words: x, y, ativo, tipo
+NUM_POWERUPS2: .word 3
+POWERUPS2:
+# powerup 1 - cura
+.word 300      # x mundo (AJUSTE conforme seu mapa)
+.word 95       # y tela
+.word 1        # ativo
+.word 0        # tipo: 0 = cura
+# powerup 2 - cura
+.word 900
+.word 90
+.word 1
+.word 0        # cura
+# powerup 3 - munição
+.word 1400
+.word 95
+.word 1
+.word 1        # tipo: 1 = munição
 # ---- constantes do mapa/scroll (ajuste LARG_PERSONAGEM pro tamanho real do sprite) ----
 .eqv MAP_LARGURA, 1692
 .eqv TELA_LARGURA, 320
@@ -120,14 +141,16 @@ ANDADOR_TIMER:  .word 0
 .eqv PLAYER_Y_CHAO, 145       # mesma posição inicial que você já usava
 .eqv IMPULSO_PULO, -13        # velocidade inicial pra cima (negativo = sobe)
 .eqv GRAVIDADE, 1             # aceleração pra baixo a cada frame
+.eqv VELY_MAX, 12             # velocidade máxima de queda
 .eqv TILE_SIZE, 12
 .eqv TILES_LARGURA, 141        # MAP_LARGURA (1692) / TILE_SIZE
 .eqv TILES_ALTURA, 20           # 240 / TILE_SIZE
+.eqv PROJETIS_MAX, 8           # munição máxima (usado pra recarregar)
 # Valores possíveis dentro da matriz:
 #   0 = nada (vazio, personagem passa livre)
 #   1 = bloco sólido (chão, plataforma, cano, parede)
 #   2 = mystery box - sai o power-up de CURA
-#   3 = mystery box - sai o SEGUNDO power-up (a implementar)
+#   3 = mystery box - sai o municao
 #   4 = porta pra próxima fase
 #   5 = mystery box JÁ USADA (vira sólida e "vazia")
 MAPA_COLISAO:
@@ -138,11 +161,11 @@ MAPA_COLISAO:
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
     .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4,4,4,0,0
@@ -198,6 +221,10 @@ MAPA_COLISAO2:
 .include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL1.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/inimigoL2.data"
 .include "script/Imagens/imagens_convertidas/arquivos .data/youwin.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/municao.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/energia.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/soco.data"
+.include "script/Imagens/imagens_convertidas/arquivos .data/canhao.data"
 .include "MACROSv24.s"
  
  
@@ -606,6 +633,7 @@ GAME_LOOP:
 	call DESENHA_TIRO
 	call DESENHA_POWERUP
 	call DESENHA_HUD 
+	call DESENHA_ARMA_HUD
 	
 	call ATUALIZA_PLANTA
 	call DESENHA_PLANTAS
@@ -763,22 +791,30 @@ GL_ATAQUE:
 	la t4, TIRO_ATIVO
 	lw t6, 0(t4)
 	bnez t6, MV_GRAVIDADE             # já tem projétil voando -> não dispara outro
+
+	la t4, PROJETIS_ATUAL
+	lw t6, 0(t4)
+	beqz t6, MV_GRAVIDADE             # sem munição -> não dispara
+	addi t6, t6, -1
+	sw t6, 0(t4)                      # gasta 1 projétil
+
 	li t6, 1
+	la t4, TIRO_ATIVO
 	sw t6, 0(t4)
 	la t4, PLAYER_X
 	lw t6, 0(t4)
 	la t4, TIRO_X
-	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL X: o projétil nasce na posição atual do personagem
+	sw t6, 0(t4)
 	la t4, PLAYER_Y
 	lw t6, 0(t4)
 	la t4, TIRO_Y
-	sw t6, 0(t4)                       # <-- POSIÇÃO INICIAL Y: o projétil nasce na mesma altura do personagem
+	sw t6, 0(t4)
 	la t4, FACING
 	lw t6, 0(t4)
 	la t4, TIRO_DIRECAO
-	sw t6, 0(t4)                       # <-- DIREÇÃO DO PROJÉTIL: copia o FACING (lado que o personagem está olhando)
+	sw t6, 0(t4)
 	la t4, TIRO_DIST
-	sw zero, 0(t4)                     # <-- ZERA A DISTÂNCIA PERCORRIDA (começa a contar do zero pro alcance máximo)
+	sw zero, 0(t4)
 	j MV_GRAVIDADE
 
 GL_TROCA_ARMA:
@@ -860,6 +896,10 @@ MV_SEM_COLISAO_BAIXO:
 	la t0, VELY_TMP
 	lw t5, 0(t0)
 	addi t5, t5, GRAVIDADE
+	li t6, VELY_MAX
+	ble t5, t6, MV_SEM_BAIXO_OK
+	mv t5, t6
+MV_SEM_BAIXO_OK:
 	la t4, VEL_Y
 	sw t5, 0(t4)
 	j MV_CHAO_FIXO
@@ -888,8 +928,13 @@ MV_SEM_COLISAO_CIMA:
 	la t0, VELY_TMP
 	lw t5, 0(t0)
 	addi t5, t5, GRAVIDADE
+	li t6, VELY_MAX
+	ble t5, t6, MV_SEM_CIMA_OK
+	mv t5, t6
+MV_SEM_CIMA_OK:
 	la t4, VEL_Y
 	sw t5, 0(t4)
+
  
 MV_CHAO_FIXO:
     la t5, PLAYER_Y_CHAO_ATUAL      # ANTES: li t5, PLAYER_Y_CHAO
@@ -1139,25 +1184,42 @@ ES_PULO1:
 #---------------------------------------------------------------------------
 DESENHA_HUD:
 	addi sp, sp, -4
-	sw ra, 0(sp)          # salva o endereço de retorno ANTES de chamar outra função
+	sw ra, 0(sp)
  
 	la t0, VIDAS
-	lw s2, 0(t0)          # vidas restantes
-	li s3, 0              # contador de ícones desenhados
-	li s4, 4              # x inicial (margem esquerda da tela)
+	lw s2, 0(t0)
+	li s3, 0
+	li s4, 4
 DH_LOOP:
-	beq s3, s2, DH_FIM
+	beq s3, s2, DH_MUNICAO
 	la a0, coracao
 	mv a1, s4
-	li a2, 4              # y (margem do topo)
-	mv a3, s1             # frame oculto atual (vem do GAME_LOOP)
-	li a4, 199            # cor de fundo transparente do ícone
+	li a2, 4
+	mv a3, s1
+	li a4, 199
 	call PRINT_PERSONAGEM
 	addi s4, s4, 34
 	addi s3, s3, 1
 	j DH_LOOP
+
+DH_MUNICAO:
+	la t0, PROJETIS_ATUAL
+	lw s2, 0(t0)          # quantos tiros restam
+	li s3, 0
+	li s4, 4              # mesma margem esquerda dos corações
+DH_MUNICAO_LOOP:
+	beq s3, s2, DH_FIM
+	la a0, municao
+	mv a1, s4
+	li a2, 30             # y abaixo da fileira de corações (ajuste se sobrepor)
+	mv a3, s1
+	li a4, 199
+	call PRINT_PERSONAGEM
+	addi s4, s4, 16
+	addi s3, s3, 1
+	j DH_MUNICAO_LOOP
 DH_FIM:
-	lw ra, 0(sp)           # restaura o endereço de retorno certo
+	lw ra, 0(sp)
 	addi sp, sp, 4
 	ret
 #---------------------------------------------------------------------------
@@ -1166,12 +1228,24 @@ DH_FIM:
 DESENHA_POWERUP:
 	addi sp, sp, -4
 	sw ra, 0(sp)
- 
+
+	la t0, FASE_ATUAL
+	lw t1, 0(t0)
+	li t2, 2
+	beq t1, t2, DP_VETOR
+
 	la t0, POWERUP_ATIVO
 	lw t1, 0(t0)
 	beqz t1, DP_FIM
  
+	la t0, POWERUP_TIPO
+	lw t1, 0(t0)
+	bnez t1, DP_MUNICAO
 	la a0, cura
+	j DP_POS
+DP_MUNICAO:
+	la a0, energia
+DP_POS:
 	la t0, POWERUP_X
 	lw t1, 0(t0)
 	la t0, CAMERA_X
@@ -1190,10 +1264,80 @@ DP_FIM:
 	lw ra, 0(sp)
 	addi sp, sp, 4
 	ret
+
+DP_VETOR:
+    la t0, NUM_POWERUPS2
+    lw s2, 0(t0)
+    la s3, POWERUPS2
+    li t3, 0
+
+DP2_LOOP:
+    beq t3, s2, DP_FIM               # sai pelo mesmo ponto (restaura ra/sp certinho)
+
+    lw t4, 8(s3)
+    beqz t4, DP2_PROXIMA
+
+    lw t5, 0(s3)
+    la t6, CAMERA_X
+    lw t6, 0(t6)
+    sub a1, t5, t6
+    bltz a1, DP2_PROXIMA
+    li t5, TELA_LARGURA
+    bge a1, t5, DP2_PROXIMA
+
+    lw a2, 4(s3)
+    lw t5, 12(s3)
+    bnez t5, DP2_MUNICAO
+    la a0, cura
+    j DP2_DESENHA
+DP2_MUNICAO:
+    la a0, energia
+DP2_DESENHA:
+    mv a3, s1
+    li a4, 199
+    call PRINT_PERSONAGEM
+DP2_PROXIMA:
+    addi s3, s3, TAM_POWERUP2
+    addi t3, t3, 1
+    j DP2_LOOP
+#---------------------------------------------------------------------------
+#      DESENHA_ARMA_HUD - mostra no canto sup. direito qual arma está ativa
+#---------------------------------------------------------------------------
+DESENHA_ARMA_HUD:
+    addi sp, sp, -4
+    sw ra, 0(sp)
+
+    la t0, ARMA_ATUAL
+    lw t1, 0(t0)
+    bnez t1, DAH_SOCO
+
+    la a0, canhao            # ícone da arma de TIRO (arma=0)
+    j DAH_POS
+DAH_SOCO:
+    la a0, soco         # ícone da arma de SOCO (arma=1)
+
+DAH_POS:
+    lw t4, 0(a0)            # largura do ícone (lida do header da imagem)
+    li t5, TELA_LARGURA
+    sub t5, t5, t4
+    addi a1, t5, -4         # x = borda direita - largura - margem de 4px
+    li a2, 4                # y = mesma margem de topo dos corações
+    mv a3, s1
+    li a4, 199
+    call PRINT_PERSONAGEM
+
+    lw ra, 0(sp)
+    addi sp, sp, 4
+    ret
 #---------------------------------------------------------------------------
 #      CHECA_COLISAO_POWERUP - personagem encostou no power-up de cura?
 #---------------------------------------------------------------------------
 CHECA_COLISAO_POWERUP:
+	la t0, FASE_ATUAL
+	lw t1, 0(t0)
+	li t2, 2
+	beq t1, t2, CCP_VETOR       # fase 2 -> usa a lista de power-ups fixos
+
 	la t0, POWERUP_ATIVO
 	lw t1, 0(t0)
 	beqz t1, CP_FIM                 # já foi coletado, não checa mais
@@ -1204,43 +1348,115 @@ CHECA_COLISAO_POWERUP:
 	
 	# --- eixo X ---
 	la t0, PLAYER_X
-	lw t3, 0(t0)                    # player x
+	lw t3, 0(t0)
 	la t0, POWERUP_X
-	lw t4, 0(t0)                    # powerup x
+	lw t4, 0(t0)
  
-	add t5, t4, t6                  # powerup_x + largura
-	bge t3, t5, CP_FIM                # player totalmente à direita -> sem colisão
+	add t5, t4, t6
+	bge t3, t5, CP_FIM
  
 	li t5, LARG_PERSONAGEM
-	add t5, t3, t5                    # player_x + largura do personagem
-	ble t5, t4, CP_FIM                  # player totalmente à esquerda -> sem colisão
+	add t5, t3, t5
+	ble t5, t4, CP_FIM
  
 	# --- eixo Y ---
 	la t0, PLAYER_Y
-	lw t3, 0(t0)                        # player y
+	lw t3, 0(t0)
 	la t0, POWERUP_Y
-	lw t4, 0(t0)                        # powerup y
+	lw t4, 0(t0)
  
-	add t5, t4, t2                      # powerup_y + altura
-	bge t3, t5, CP_FIM                    # player totalmente abaixo -> sem colisão
+	add t5, t4, t2
+	bge t3, t5, CP_FIM
  
-	li t5, LARG_PERSONAGEM                # personagem é quadrado (48x48), reaproveita como altura
+	li t5, LARG_PERSONAGEM
 	add t5, t3, t5
-	ble t5, t4, CP_FIM                      # player totalmente acima -> sem colisão
+	ble t5, t4, CP_FIM
  
-	# --- colidiu! cura se não estiver no máximo ---
+	# --- colidiu! ---
+	la t0, POWERUP_TIPO
+	lw t1, 0(t0)
+	bnez t1, CP_MUNICAO
+
 	la t0, VIDAS
 	lw t1, 0(t0)
 	la t4, VIDAS_MAX
 	lw t4, 0(t4)
-	bge t1, t4, CP_REMOVE            # vida já no máximo -> só remove o power-up mesmo assim
+	bge t1, t4, CP_REMOVE
 	addi t1, t1, 1
 	sw t1, 0(t0)
+	j CP_REMOVE
+
+CP_MUNICAO:
+	la t0, PROJETIS_ATUAL
+	li t1, PROJETIS_MAX
+	sw t1, 0(t0)
+
 CP_REMOVE:
 	la t0, POWERUP_ATIVO
-	sw zero, 0(t0)                     # some da tela (não desenha mais, não colide mais)
+	sw zero, 0(t0)
 CP_FIM:
 	ret
+
+CCP_VETOR:
+    la t0, NUM_POWERUPS2
+    lw s2, 0(t0)
+    la s3, POWERUPS2
+    li t3, 0
+
+CCP2_LOOP:
+    beq t3, s2, CP_FIM              # reaproveita o mesmo ponto de saída
+
+    lw t4, 8(s3)                    # ativo?
+    beqz t4, CCP2_PROXIMA
+
+    lw a0, 12(s3)                   # tipo
+    bnez a0, CCP2_TAM_MUNICAO
+    la a1, cura
+    j CCP2_TAM_OK
+CCP2_TAM_MUNICAO:
+    la a1, energia
+CCP2_TAM_OK:
+    lw t6, 0(a1)
+    lw t2, 4(a1)
+
+    lw t5, 0(s3)
+    la t0, PLAYER_X
+    lw t1, 0(t0)
+    add t4, t5, t6
+    bge t1, t4, CCP2_PROXIMA
+    li t4, LARG_PERSONAGEM
+    add t4, t1, t4
+    ble t4, t5, CCP2_PROXIMA
+
+    lw t5, 4(s3)
+    la t0, PLAYER_Y
+    lw t1, 0(t0)
+    add t4, t5, t2
+    bge t1, t4, CCP2_PROXIMA
+    li t4, LARG_PERSONAGEM
+    add t4, t1, t4
+    ble t4, t5, CCP2_PROXIMA
+
+    lw a0, 12(s3)
+    bnez a0, CCP2_MUNICAO
+    la t0, VIDAS
+    lw t1, 0(t0)
+    la t4, VIDAS_MAX
+    lw t4, 0(t4)
+    bge t1, t4, CCP2_REMOVE
+    addi t1, t1, 1
+    sw t1, 0(t0)
+    j CCP2_REMOVE
+CCP2_MUNICAO:
+    la t0, PROJETIS_ATUAL
+    li t1, PROJETIS_MAX
+    sw t1, 0(t0)
+CCP2_REMOVE:
+    sw zero, 8(s3)
+CCP2_PROXIMA:
+    addi s3, s3, TAM_POWERUP2
+    addi t3, t3, 1
+    j CCP2_LOOP
 # ---------------------------------------------------------
 # Le o valor do tile numa posição do MUNDO
 # ---------------------------------------------------------
@@ -1429,6 +1645,8 @@ CBB_ABRE_POWERUP2:
     j CBB_SPAWN
  
 CBB_SPAWN:
+    la t0, POWERUP_TIPO
+    sw t2, 0(t0)                    # guarda o tipo ANTES da call
     # marca a mystery box como usada (vira bloco sólido "vazio", tipo Mario)
     la t0, PLAYER_X
     lw a0, 0(t0)
